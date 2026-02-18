@@ -905,7 +905,6 @@ ${list
 											>🗑️</button>
 										</div>
 									</div>
-									</div>
 
 									{#if entry.nikki}
 										<p class="entry-nikki">{entry.nikki}</p>

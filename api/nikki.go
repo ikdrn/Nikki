@@ -65,7 +65,7 @@ func appendToSheet(row []interface{}) error {
 		return fmt.Errorf("failed to create sheets service: %w", err)
 	}
 
-	rangeStr := "Sheet1!A:G"
+	rangeStr := "シート1!A:G"
 	vr := &sheets.ValueRange{
 		Values: [][]interface{}{row},
 	}

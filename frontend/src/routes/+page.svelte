@@ -118,7 +118,7 @@
 		loadingHistory = true;
 		historyError = '';
 		try {
-			const res = await fetch(`${API_BASE}/entries`);
+			const res = await fetch(`${API_BASE}/nikki`);
 			if (!res.ok) {
 				const data = await res.json().catch(() => ({}));
 				throw new Error(data.error || `HTTP ${res.status}`);

@@ -82,7 +82,7 @@
 				messageType = 'error';
 			}
 		} catch (e) {
-			message = '保存失敗';
+			message = `通信エラー: ${e instanceof Error ? e.message : String(e)}`;
 			messageType = 'error';
 		} finally {
 			saving = false;

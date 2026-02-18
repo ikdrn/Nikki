@@ -92,6 +92,39 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// GET: env変数の設定状況を確認するヘルスチェック
+	if r.Method == http.MethodGet {
+		type HealthResponse struct {
+			CredSet   bool   `json:"cred_set"`
+			CredValid bool   `json:"cred_valid"`
+			SheetSet  bool   `json:"sheet_set"`
+			SheetID   string `json:"sheet_id,omitempty"`
+			Status    string `json:"status"`
+		}
+		credJSON := os.Getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+		sheetID := os.Getenv("GOOGLE_SHEET_ID")
+		credValid := credJSON != "" && json.Valid([]byte(credJSON))
+		var status string
+		switch {
+		case credJSON == "":
+			status = "ERROR: GOOGLE_SERVICE_ACCOUNT_JSON が未設定"
+		case !credValid:
+			status = "ERROR: GOOGLE_SERVICE_ACCOUNT_JSON が不正なJSON"
+		case sheetID == "":
+			status = "ERROR: GOOGLE_SHEET_ID が未設定"
+		default:
+			status = "OK: env変数はすべて設定されています"
+		}
+		json.NewEncoder(w).Encode(HealthResponse{
+			CredSet:   credJSON != "",
+			CredValid: credValid,
+			SheetSet:  sheetID != "",
+			SheetID:   sheetID,
+			Status:    status,
+		})
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		json.NewEncoder(w).Encode(NikkiResponse{Success: false, Message: "method not allowed"})
@@ -134,7 +167,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err := appendToSheet(row); err != nil {
 		log.Printf("sheets error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(NikkiResponse{Success: false, Message: "保存失敗"})
+		json.NewEncoder(w).Encode(NikkiResponse{Success: false, Message: err.Error()})
 		return
 	}
 

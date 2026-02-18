@@ -1,0 +1,19 @@
+# 環境変数（絶対にコミットしない）
+.env
+.env.local
+
+# Node
+node_modules/
+frontend/.svelte-kit/
+frontend/build/
+
+# Go
+backend/vendor/
+api/vendor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel/

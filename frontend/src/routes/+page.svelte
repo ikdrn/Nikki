@@ -52,10 +52,10 @@
 	let historyError = '';
 	let searchName = '';
 	let searchDate = '';
+	let searchRank = '';
 	let sortOrder: 'newest' | 'oldest' = 'newest';
 
-	// ── 選択モード ──
-	let selectionMode = false;
+	// ── 選択 ──
 	let selectedIndices = new Set<number>();
 
 	// ── 編集モーダル ──
@@ -77,6 +77,7 @@
 		.filter((e) => {
 			if (searchName && !e.name.toLowerCase().includes(searchName.toLowerCase())) return false;
 			if (searchDate && e.date !== searchDate) return false;
+			if (searchRank && e.rank1 !== searchRank && e.rank2 !== searchRank) return false;
 			return true;
 		})
 		.sort((a, b) => {
@@ -294,7 +295,6 @@
 			const data = await res.json();
 			if (data.success) {
 				selectedIndices = new Set();
-				selectionMode = false;
 				await loadHistory();
 			} else {
 				showMsg(data.message || '削除失敗', 'error');
@@ -363,11 +363,6 @@
 	}
 
 	// ── 選択 ──
-	function toggleSelectionMode() {
-		selectionMode = !selectionMode;
-		if (!selectionMode) selectedIndices = new Set();
-	}
-
 	function toggleSelect(index: number) {
 		const next = new Set(selectedIndices);
 		next.has(index) ? next.delete(index) : next.add(index);
@@ -701,6 +696,17 @@ ${list
 						<label for="search-date">日付で絞り込み</label>
 						<input id="search-date" type="date" bind:value={searchDate} />
 					</div>
+					<div class="field rank-filter-field">
+						<label for="search-rank">ランクで絞り込み</label>
+						<select id="search-rank" bind:value={searchRank}>
+							<option value="">全てのランク</option>
+							{#each RANKS as r}
+								{#if r}
+									<option value={r}>{r}</option>
+								{/if}
+							{/each}
+						</select>
+					</div>
 				</div>
 				<div class="controls-bottom">
 					<div class="sort-group">
@@ -724,19 +730,12 @@ ${list
 						>
 							{loadingHistory ? '⌛' : '🔄'}
 						</button>
-						<button
-							class="select-toggle-btn"
-							class:active={selectionMode}
-							on:click={toggleSelectionMode}
-						>
-							{selectionMode ? '✕ 選択終了' : '☑ 複数選択'}
-						</button>
 					</div>
 				</div>
 			</div>
 
 			<!-- 選択ツールバー -->
-			{#if selectionMode && filteredEntries.length > 0}
+			{#if selectedCount > 0}
 				<div class="selection-toolbar" transition:slide={{ duration: 200 }}>
 					<button class="toolbar-check-btn" on:click={toggleSelectAll}>
 						{allSelected ? '☑ 全解除' : '☐ 全選択'}
@@ -776,7 +775,7 @@ ${list
 			{/if}
 
 			<!-- 非選択時のエクスポートボタン -->
-			{#if !selectionMode && filteredEntries.length > 0}
+			{#if selectedCount === 0 && filteredEntries.length > 0}
 				<div class="export-bar">
 					<span class="entry-count">{filteredEntries.length}件</span>
 					<div
@@ -878,37 +877,34 @@ ${list
 								</div>
 							{:else}
 								<!-- 通常表示 -->
-								{#if selectionMode}
-									<button
-										class="check-circle"
-										class:checked={selectedIndices.has(entry.row_index)}
-										on:click={() => toggleSelect(entry.row_index)}
-										aria-label="選択"
-									>
-										{#if selectedIndices.has(entry.row_index)}✓{/if}
-									</button>
-								{/if}
+								<button
+									class="check-circle"
+									class:checked={selectedIndices.has(entry.row_index)}
+									on:click={() => toggleSelect(entry.row_index)}
+									aria-label="選択"
+								>
+									{#if selectedIndices.has(entry.row_index)}✓{/if}
+								</button>
 
-								<div class="entry-body" on:click={() => selectionMode && toggleSelect(entry.row_index)}>
+								<div class="entry-body">
 									<div class="entry-header">
 										<span class="entry-date">{fmtDate(entry.date)}</span>
 										{#if entry.name}
 											<span class="entry-title-badge">{entry.name}</span>
 										{/if}
-										{#if !selectionMode}
-											<div class="entry-actions">
-												<button
-													class="action-btn edit-btn"
-													title="編集"
-													on:click|stopPropagation={() => startEdit(entry)}
-												>✏️</button>
-												<button
-													class="action-btn delete-btn"
-													title="削除"
-													on:click|stopPropagation={() => deleteEntries([entry.row_index])}
-												>🗑️</button>
-											</div>
-										{/if}
+										<div class="entry-actions">
+											<button
+												class="action-btn edit-btn"
+												title="編集"
+												on:click|stopPropagation={() => startEdit(entry)}
+											>✏️</button>
+											<button
+												class="action-btn delete-btn"
+												title="削除"
+												on:click|stopPropagation={() => deleteEntries([entry.row_index])}
+											>🗑️</button>
+										</div>
+									</div>
 									</div>
 
 									{#if entry.nikki}

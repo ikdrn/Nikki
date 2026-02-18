@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(echo:*)",
+      "Bash(git --version:*)",
+      "Bash(git -C \"C:/Users/ikere/OneDrive/デスクトップ/プログラミング/Nikki-claude-apex-diary-app-wko92\" remote -v)",
+      "Bash(cmd /c \"dir C:\\\\Users\\\\ikere\\\\OneDrive\")",
+      "Bash(cmd /c \"git remote -v\")",
+      "Bash(cmd /c \"git remote -v 2>&1\")",
+      "Bash(cmd /c \"git remote -v && echo DONE\")",
+      "Bash(powershell -Command:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git checkout:*)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(where:*)",
+      "Bash(cmd /c \"python --version\")",
+      "Bash(powershell -NoProfile -Command \"Get-ChildItem ''C:\\\\Users\\\\ikere\\\\AppData\\\\Local\\\\Programs'' -Recurse -Filter ''python.exe'' -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName\")",
+      "Bash(powershell -NoProfile -File \"C:\\\\tmp\\\\fix_svelte.py\")",
+      "Bash(powershell -NoProfile -Command \"python ''C:\\\\tmp\\\\fix_svelte.py''\")",
+      "Bash(powershell -NoProfile -Command \"& python C:/tmp/fix_svelte.py\")",
+      "Bash(powershell -NoProfile -Command \"Write-Output $env:TEMP\")",
+      "Bash(powershell -NoProfile -Command \"\n$script = @''\nimport re\n\npath = r\"\"C:\\\\Users\\\\ikere\\\\OneDrive\\\\u30c7\\\\u30b9\\\\u30af\\\\u30c8\\\\u30c3\\\\u30d7\\\\\\\\u30d7\\\\u30ed\\\\u30b0\\\\u30e9\\\\u30df\\\\u30f3\\\\u30b0\\\\Nikki-claude-apex-diary-app-wko92\\\\frontend\\\\src\\\\routes\\\\+page.svelte\"\"\n\nwith open\\(path, \"\"r\"\", encoding=\"\"utf-8\"\"\\) as f:\n    content = f.read\\(\\)\n\nidx = content.find\\(\"\"\\\\u901a\\\\u5e38\\\\u8868\\\\u793a\"\"\\)\nif idx >= 0:\n    print\\(\"\"Found at index:\"\", idx\\)\n    print\\(repr\\(content[idx-10:idx+300]\\)\\)\nelse:\n    print\\(\"\"Not found\"\"\\)\n''@\n$script | Out-File -FilePath ''C:\\\\Users\\\\ikere\\\\AppData\\\\Local\\\\Temp\\\\check_svelte.py'' -Encoding UTF8\npython ''C:\\\\Users\\\\ikere\\\\AppData\\\\Local\\\\Temp\\\\check_svelte.py''\n\")",
+      "Bash(mount:*)",
+      "Bash(node --version:*)",
+      "Bash(powershell -NoProfile -Command \"node --version\")",
+      "Bash(powershell -NoProfile -Command:*)",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\ikere\\\\AppData\\\\Local\\\\Temp\\\\test_svelte.ps1\")",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\ikere\\\\AppData\\\\Local\\\\Temp\\\\diag_svelte.ps1\")",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\ikere\\\\AppData\\\\Local\\\\Temp\\\\diag2.ps1\")"
+    ]
+  }
+}

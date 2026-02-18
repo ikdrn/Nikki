@@ -484,13 +484,13 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif; padding: 32px; color: #111827; }
-  h1 { font-size: 22px; font-weight: 700; color: #6d28d9; margin-bottom: 4px; }
+  h1 { font-size: 22px; font-weight: 700; color: #0284c7; margin-bottom: 4px; }
   .meta { font-size: 12px; color: #6b7280; margin-bottom: 28px; }
   .entry { margin-bottom: 28px; border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; }
   .entry:last-child { border-bottom: none; }
   .entry-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
-  .date { font-size: 15px; font-weight: 700; color: #6d28d9; }
-  .badge { font-size: 11px; background: #ede9fe; color: #7c3aed; padding: 2px 8px; border-radius: 20px; }
+  .date { font-size: 15px; font-weight: 700; color: #0284c7; }
+  .badge { font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 20px; }
   .nikki { white-space: pre-wrap; line-height: 1.75; font-size: 13.5px; color: #1f2937; }
   .ranks { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
   .rank-badge { font-size: 12px; background: #f3f4f6; border: 1px solid #e5e7eb; padding: 2px 10px; border-radius: 6px; }
@@ -969,7 +969,7 @@ ${list
 	:global(body) {
 		font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
 		background: #f1f5f9;
-		color: #1e1b4b;
+		color: #0c2340;
 		min-height: 100vh;
 	}
 
@@ -987,7 +987,7 @@ ${list
 		padding: 1.5rem 1rem 1.25rem;
 		background: #fff;
 		border-radius: 16px;
-		box-shadow: 0 1px 4px rgba(109, 40, 217, 0.08), 0 0 0 1px rgba(109, 40, 217, 0.06);
+		box-shadow: 0 1px 4px rgba(2, 132, 199, 0.08), 0 0 0 1px rgba(2, 132, 199, 0.06);
 	}
 
 	.logo {
@@ -999,7 +999,7 @@ ${list
 	h1 {
 		font-size: 1.6rem;
 		font-weight: 800;
-		color: #6d28d9;
+		color: #0284c7;
 		letter-spacing: -0.01em;
 	}
 
@@ -1044,9 +1044,9 @@ ${list
 	}
 
 	.tab-btn.active {
-		background: #6d28d9;
+		background: #0284c7;
 		color: #fff;
-		box-shadow: 0 2px 8px rgba(109, 40, 217, 0.35);
+		box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
 	}
 
 	.tab-icon {
@@ -1191,7 +1191,7 @@ ${list
 		background: #fff;
 		border: 1.5px solid #e5e7eb;
 		border-radius: 9px;
-		color: #1e1b4b;
+		color: #0c2340;
 		font-size: 0.95rem;
 		padding: 0.6rem 0.85rem;
 		width: 100%;
@@ -1206,8 +1206,8 @@ ${list
 	select:focus,
 	textarea:focus {
 		outline: none;
-		border-color: #7c3aed;
-		box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+		border-color: #0369a1;
+		box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
 	}
 
 	textarea {
@@ -1229,7 +1229,7 @@ ${list
 
 	/* ── 保存ボタン ── */
 	.save-btn {
-		background: linear-gradient(135deg, #7c3aed, #6d28d9);
+		background: linear-gradient(135deg, #0369a1, #0284c7);
 		border: none;
 		border-radius: 12px;
 		color: #fff;
@@ -1241,7 +1241,7 @@ ${list
 		padding: 0.9rem;
 		transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
 		width: 100%;
-		box-shadow: 0 4px 14px rgba(109, 40, 217, 0.4);
+		box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1250,7 +1250,7 @@ ${list
 
 	.save-btn:hover:not(:disabled) {
 		opacity: 0.9;
-		box-shadow: 0 6px 20px rgba(109, 40, 217, 0.45);
+		box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
 	}
 
 	.save-btn:active:not(:disabled) {
@@ -1330,9 +1330,9 @@ ${list
 	}
 
 	.sort-btn.active {
-		background: #ede9fe;
-		border-color: #c4b5fd;
-		color: #6d28d9;
+		background: #e0f2fe;
+		border-color: #7dd3fc;
+		color: #0284c7;
 	}
 
 	.sort-btn:not(.active):hover {
@@ -1374,9 +1374,9 @@ ${list
 	}
 
 	.select-toggle-btn.active {
-		background: #ede9fe;
-		border-color: #c4b5fd;
-		color: #6d28d9;
+		background: #e0f2fe;
+		border-color: #7dd3fc;
+		color: #0284c7;
 	}
 
 	.select-toggle-btn:not(.active):hover {
@@ -1386,7 +1386,7 @@ ${list
 
 	/* ── 選択ツールバー ── */
 	.selection-toolbar {
-		background: #6d28d9;
+		background: #0284c7;
 		border-radius: 12px;
 		padding: 0.75rem 1rem;
 		margin-bottom: 0.75rem;
@@ -1477,8 +1477,8 @@ ${list
 	}
 
 	.export-btn-ghost:hover {
-		border-color: #7c3aed;
-		color: #6d28d9;
+		border-color: #0369a1;
+		color: #0284c7;
 	}
 
 	/* ── エクスポートドロップダウン ── */
@@ -1537,7 +1537,7 @@ ${list
 		width: 32px;
 		height: 32px;
 		border: 3px solid #e5e7eb;
-		border-top-color: #7c3aed;
+		border-top-color: #0369a1;
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}
@@ -1578,13 +1578,13 @@ ${list
 	}
 
 	.entry-card:hover {
-		border-color: #ddd6fe;
-		box-shadow: 0 2px 8px rgba(109, 40, 217, 0.08);
+		border-color: #bae6fd;
+		box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
 	}
 
 	.entry-card.selected {
-		border-color: #7c3aed;
-		background: #faf5ff;
+		border-color: #0369a1;
+		background: #f0f9ff;
 	}
 
 	.entry-body {
@@ -1605,13 +1605,13 @@ ${list
 	.entry-date {
 		font-size: 0.95rem;
 		font-weight: 700;
-		color: #6d28d9;
+		color: #0284c7;
 	}
 
 	.entry-title-badge {
-		background: #ede9fe;
+		background: #e0f2fe;
 		border-radius: 20px;
-		color: #7c3aed;
+		color: #0369a1;
 		font-size: 0.75rem;
 		font-weight: 600;
 		padding: 0.15rem 0.6rem;
@@ -1695,14 +1695,14 @@ ${list
 	}
 
 	.check-circle.checked {
-		background: #7c3aed;
-		border-color: #7c3aed;
+		background: #0369a1;
+		border-color: #0369a1;
 		color: #fff;
 	}
 
 	.check-circle:hover:not(.checked) {
-		border-color: #7c3aed;
-		background: #ede9fe;
+		border-color: #0369a1;
+		background: #e0f2fe;
 	}
 
 	/* ── 編集フォーム ── */
@@ -1716,7 +1716,7 @@ ${list
 	.edit-title {
 		font-size: 0.82rem;
 		font-weight: 700;
-		color: #6d28d9;
+		color: #0284c7;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 	}
@@ -1746,7 +1746,7 @@ ${list
 	}
 
 	.update-btn {
-		background: #6d28d9;
+		background: #0284c7;
 		border: none;
 		border-radius: 8px;
 		color: #fff;

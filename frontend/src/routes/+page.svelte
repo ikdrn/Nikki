@@ -45,6 +45,7 @@
 		rank2: string;
 		point2: string;
 		timestamp: string;
+		photos: string[];
 	}
 
 	let entries: Entry[] = [];
@@ -67,7 +68,13 @@
 	let editPoint1: number | null = null;
 	let editRank2 = '';
 	let editPoint2: number | null = null;
+	let editPhotoIds: string[] = [];
+	let editNewPhotoFiles: File[] = [];
 	let editSaving = false;
+
+	// ── 写真 ──
+	let photoFiles: File[] = [];
+	let uploadingPhotos = false;
 
 	// ── エクスポートメニュー ──
 	let showExportMenu = false;
@@ -220,17 +227,25 @@
 		if (saving || now - lastSaveTime < 500) return;
 
 		saving = true;
-		const payload: Record<string, unknown> = {
-			date,
-			name: title,
-			nikki: nikki.trim(),
-			rank1,
-			rank2
-		};
-		if (point1 !== null && String(point1) !== '') payload.point1 = Number(point1);
-		if (point2 !== null && String(point2) !== '') payload.point2 = Number(point2);
-
 		try {
+			let uploadedPhotoIds: string[] = [];
+			if (photoFiles.length > 0) {
+				uploadingPhotos = true;
+				uploadedPhotoIds = await uploadPhotos(photoFiles);
+				uploadingPhotos = false;
+			}
+
+			const payload: Record<string, unknown> = {
+				date,
+				name: title,
+				nikki: nikki.trim(),
+				rank1,
+				rank2,
+				photos: uploadedPhotoIds
+			};
+			if (point1 !== null && String(point1) !== '') payload.point1 = Number(point1);
+			if (point2 !== null && String(point2) !== '') payload.point2 = Number(point2);
+
 			const res = await fetch(`${API_BASE}/nikki`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -247,11 +262,13 @@
 				point1 = null;
 				rank2 = '';
 				point2 = null;
+				photoFiles = [];
 				entries = [];
 			} else {
 				showMsg(data.message || '保存失敗', 'error');
 			}
 		} catch (e) {
+			uploadingPhotos = false;
 			showMsg(`通信エラー: ${e instanceof Error ? e.message : String(e)}`, 'error');
 		} finally {
 			saving = false;
@@ -314,6 +331,8 @@
 		editPoint1 = parsePointStr(entry.point1);
 		editRank2 = entry.rank2;
 		editPoint2 = parsePointStr(entry.point2);
+		editPhotoIds = entry.photos ? [...entry.photos] : [];
+		editNewPhotoFiles = [];
 	}
 
 	function parsePointStr(s: string): number | null {
@@ -331,18 +350,25 @@
 			return;
 		}
 		editSaving = true;
-		const payload: Record<string, unknown> = {
-			row_index: editingEntry!.row_index,
-			date: editDate,
-			name: editTitle,
-			nikki: editNikki.trim(),
-			rank1: editRank1,
-			rank2: editRank2
-		};
-		if (editPoint1 !== null && String(editPoint1) !== '') payload.point1 = Number(editPoint1);
-		if (editPoint2 !== null && String(editPoint2) !== '') payload.point2 = Number(editPoint2);
-
 		try {
+			let newPhotoIds: string[] = [];
+			if (editNewPhotoFiles.length > 0) {
+				newPhotoIds = await uploadPhotos(editNewPhotoFiles);
+			}
+			const allPhotoIds = [...editPhotoIds, ...newPhotoIds];
+
+			const payload: Record<string, unknown> = {
+				row_index: editingEntry!.row_index,
+				date: editDate,
+				name: editTitle,
+				nikki: editNikki.trim(),
+				rank1: editRank1,
+				rank2: editRank2,
+				photos: allPhotoIds
+			};
+			if (editPoint1 !== null && String(editPoint1) !== '') payload.point1 = Number(editPoint1);
+			if (editPoint2 !== null && String(editPoint2) !== '') payload.point2 = Number(editPoint2);
+
 			const res = await fetch(`${API_BASE}/nikki`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
@@ -535,6 +561,39 @@ ${list
 		else exportMd();
 	}
 
+	// ── 写真 ──
+	function photoUrl(fileId: string): string {
+		return `https://drive.google.com/uc?export=view&id=${fileId}`;
+	}
+
+	async function uploadPhotos(files: File[]): Promise<string[]> {
+		const fileIds: string[] = [];
+		for (const file of files) {
+			const formData = new FormData();
+			formData.append('photo', file);
+			const res = await fetch(`${API_BASE}/photo`, { method: 'POST', body: formData });
+			const data = await res.json();
+			if (data.success && data.file_id) {
+				fileIds.push(data.file_id);
+			} else {
+				throw new Error(data.message || '写真のアップロードに失敗しました');
+			}
+		}
+		return fileIds;
+	}
+
+	function removeNewPhoto(index: number) {
+		photoFiles = photoFiles.filter((_, i) => i !== index);
+	}
+
+	function removeEditExistingPhoto(index: number) {
+		editPhotoIds = editPhotoIds.filter((_, i) => i !== index);
+	}
+
+	function removeEditNewPhoto(index: number) {
+		editNewPhotoFiles = editNewPhotoFiles.filter((_, i) => i !== index);
+	}
+
 	// click-outside アクション
 	function clickOutside(node: HTMLElement, cb: () => void) {
 		const handler = (e: MouseEvent) => {
@@ -670,9 +729,44 @@ ${list
 					</div>
 				</div>
 
+				<!-- 写真 -->
+				<div class="photo-section">
+					<p class="photo-section-label">写真を追加 <span class="optional">（任意・最大5枚）</span></p>
+					{#if photoFiles.length > 0}
+						<div class="photo-preview-grid">
+							{#each photoFiles as file, i}
+								<div class="photo-preview-item">
+									<img src={URL.createObjectURL(file)} alt="プレビュー" />
+									<button type="button" class="photo-remove-btn" on:click={() => removeNewPhoto(i)}>×</button>
+								</div>
+							{/each}
+						</div>
+					{/if}
+					{#if photoFiles.length < 5}
+						<label class="photo-upload-btn" for="photo-input">
+							📷 写真を選択
+						</label>
+						<input
+							id="photo-input"
+							type="file"
+							accept="image/*"
+							multiple
+							style="display:none"
+							on:change={(e) => {
+								const input = e.target as HTMLInputElement;
+								const files = Array.from(input.files ?? []);
+								photoFiles = [...photoFiles, ...files].slice(0, 5);
+								input.value = '';
+							}}
+						/>
+					{/if}
+				</div>
+
 				<!-- 保存ボタン -->
-				<button type="submit" class="save-btn" disabled={saving}>
-					{#if saving}
+				<button type="submit" class="save-btn" disabled={saving || uploadingPhotos}>
+					{#if uploadingPhotos}
+						<span class="spinner"></span> 写真をアップロード中...
+					{:else if saving}
 						<span class="spinner"></span> 保存中...
 					{:else}
 						💾 保存する
@@ -866,6 +960,46 @@ ${list
 											<input type="number" bind:value={editPoint2} min="0" max="99999" />
 										</div>
 									</div>
+									<!-- 写真編集 -->
+									<div class="photo-section">
+										<p class="photo-section-label">写真 <span class="optional">（任意・最大5枚）</span></p>
+										{#if editPhotoIds.length > 0 || editNewPhotoFiles.length > 0}
+											<div class="photo-preview-grid">
+												{#each editPhotoIds as photoId, i}
+													<div class="photo-preview-item">
+														<img src={photoUrl(photoId)} alt="写真" />
+														<button type="button" class="photo-remove-btn" on:click={() => removeEditExistingPhoto(i)}>×</button>
+													</div>
+												{/each}
+												{#each editNewPhotoFiles as file, i}
+													<div class="photo-preview-item">
+														<img src={URL.createObjectURL(file)} alt="プレビュー" />
+														<button type="button" class="photo-remove-btn" on:click={() => removeEditNewPhoto(i)}>×</button>
+													</div>
+												{/each}
+											</div>
+										{/if}
+										{#if editPhotoIds.length + editNewPhotoFiles.length < 5}
+											<label class="photo-upload-btn" for="edit-photo-input">
+												📷 写真を追加
+											</label>
+											<input
+												id="edit-photo-input"
+												type="file"
+												accept="image/*"
+												multiple
+												style="display:none"
+												on:change={(e) => {
+													const input = e.target as HTMLInputElement;
+													const files = Array.from(input.files ?? []);
+													const remaining = 5 - editPhotoIds.length - editNewPhotoFiles.length;
+													editNewPhotoFiles = [...editNewPhotoFiles, ...files.slice(0, remaining)];
+													input.value = '';
+												}}
+											/>
+										{/if}
+									</div>
+
 									<div class="edit-actions">
 										<button class="cancel-btn" on:click={cancelEdit} disabled={editSaving}>
 											キャンセル
@@ -922,6 +1056,21 @@ ${list
 													>{entry.rank2}{entry.point2 ? ' ' + entry.point2 : ''}</span
 												>
 											{/if}
+										</div>
+									{/if}
+
+									{#if entry.photos && entry.photos.length > 0}
+										<div class="entry-photos">
+											{#each entry.photos as photoId}
+												<a href={photoUrl(photoId)} target="_blank" rel="noopener noreferrer">
+													<img
+														class="entry-photo-thumb"
+														src={photoUrl(photoId)}
+														alt="写真"
+														loading="lazy"
+													/>
+												</a>
+											{/each}
 										</div>
 									{/if}
 
@@ -1803,6 +1952,113 @@ ${list
 		min-width: 22px;
 		padding: 0.1rem 0.4rem;
 		text-align: center;
+	}
+
+	/* ── 写真セクション ── */
+	.photo-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		background: #fafafa;
+		border: 1px solid #f3f4f6;
+		border-radius: 12px;
+		padding: 1rem;
+	}
+
+	.photo-section-label {
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: #6b7280;
+	}
+
+	.photo-upload-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		background: #fff;
+		border: 1.5px dashed #d1d5db;
+		border-radius: 9px;
+		color: #6b7280;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: 0.875rem;
+		font-weight: 600;
+		padding: 0.6rem 1rem;
+		transition: all 0.15s;
+		width: fit-content;
+	}
+
+	.photo-upload-btn:hover {
+		border-color: #0369a1;
+		color: #0284c7;
+		background: #f0f9ff;
+	}
+
+	.photo-preview-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.photo-preview-item {
+		position: relative;
+		width: 80px;
+		height: 80px;
+		border-radius: 8px;
+		overflow: hidden;
+		flex-shrink: 0;
+	}
+
+	.photo-preview-item img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.photo-remove-btn {
+		position: absolute;
+		top: 2px;
+		right: 2px;
+		background: rgba(0, 0, 0, 0.6);
+		border: none;
+		border-radius: 50%;
+		color: #fff;
+		cursor: pointer;
+		font-size: 0.75rem;
+		font-weight: 700;
+		width: 18px;
+		height: 18px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		line-height: 1;
+		padding: 0;
+	}
+
+	.photo-remove-btn:hover {
+		background: rgba(239, 68, 68, 0.9);
+	}
+
+	/* ── エントリー写真表示 ── */
+	.entry-photos {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.entry-photo-thumb {
+		width: 80px;
+		height: 80px;
+		object-fit: cover;
+		border-radius: 8px;
+		border: 1px solid #e5e7eb;
+		cursor: pointer;
+		transition: opacity 0.15s;
+		display: block;
+	}
+
+	.entry-photo-thumb:hover {
+		opacity: 0.85;
 	}
 
 	/* ── レスポンシブ ── */

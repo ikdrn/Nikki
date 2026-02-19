@@ -18,24 +18,26 @@ import (
 const sheetTab = "シート1"
 
 type NikkiRequest struct {
-	Date   string `json:"date"`
-	Name   string `json:"name"`
-	Nikki  string `json:"nikki"`
-	Rank1  string `json:"rank1"`
-	Point1 *int   `json:"point1"`
-	Rank2  string `json:"rank2"`
-	Point2 *int   `json:"point2"`
+	Date   string   `json:"date"`
+	Name   string   `json:"name"`
+	Nikki  string   `json:"nikki"`
+	Rank1  string   `json:"rank1"`
+	Point1 *int     `json:"point1"`
+	Rank2  string   `json:"rank2"`
+	Point2 *int     `json:"point2"`
+	Photos []string `json:"photos"`
 }
 
 type UpdateRequest struct {
-	RowIndex int    `json:"row_index"`
-	Date     string `json:"date"`
-	Name     string `json:"name"`
-	Nikki    string `json:"nikki"`
-	Rank1    string `json:"rank1"`
-	Point1   *int   `json:"point1"`
-	Rank2    string `json:"rank2"`
-	Point2   *int   `json:"point2"`
+	RowIndex int      `json:"row_index"`
+	Date     string   `json:"date"`
+	Name     string   `json:"name"`
+	Nikki    string   `json:"nikki"`
+	Rank1    string   `json:"rank1"`
+	Point1   *int     `json:"point1"`
+	Rank2    string   `json:"rank2"`
+	Point2   *int     `json:"point2"`
+	Photos   []string `json:"photos"`
 }
 
 type DeleteRequest struct {
@@ -48,16 +50,17 @@ type NikkiResponse struct {
 }
 
 type Entry struct {
-	RowIndex  int    `json:"row_index"`
-	RowName   string `json:"row_name"`
-	Date      string `json:"date"`
-	Name      string `json:"name"`
-	Nikki     string `json:"nikki"`
-	Rank1     string `json:"rank1"`
-	Point1    string `json:"point1"`
-	Rank2     string `json:"rank2"`
-	Point2    string `json:"point2"`
-	Timestamp string `json:"timestamp"`
+	RowIndex  int      `json:"row_index"`
+	RowName   string   `json:"row_name"`
+	Date      string   `json:"date"`
+	Name      string   `json:"name"`
+	Nikki     string   `json:"nikki"`
+	Rank1     string   `json:"rank1"`
+	Point1    string   `json:"point1"`
+	Rank2     string   `json:"rank2"`
+	Point2    string   `json:"point2"`
+	Timestamp string   `json:"timestamp"`
+	Photos    []string `json:"photos"`
 }
 
 func generateRowName(date, name string) (string, error) {
@@ -126,6 +129,12 @@ func parseEntry(sheetRow int, row []interface{}) (Entry, bool) {
 	if len(row) > 6 {
 		e.Timestamp = cellStr(row[6])
 	}
+	if len(row) > 7 {
+		photosStr := cellStr(row[7])
+		if photosStr != "" {
+			e.Photos = strings.Split(photosStr, ",")
+		}
+	}
 	return e, true
 }
 
@@ -164,7 +173,7 @@ func readEntries(ctx context.Context) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := srv.Spreadsheets.Values.Get(spreadsheetID, sheetTab+"!A:G").Context(ctx).Do()
+	resp, err := srv.Spreadsheets.Values.Get(spreadsheetID, sheetTab+"!A:H").Context(ctx).Do()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read sheet: %w", err)
 	}
@@ -192,7 +201,7 @@ func appendToSheet(row []interface{}) error {
 	return nil
 }
 
-func buildRow(date, name, nikki, rank1, rank2 string, point1, point2 *int) ([]interface{}, string, error) {
+func buildRow(date, name, nikki, rank1, rank2 string, point1, point2 *int, photos []string) ([]interface{}, string, error) {
 	rowName, err := generateRowName(date, name)
 	if err != nil {
 		return nil, "", err
@@ -207,6 +216,7 @@ func buildRow(date, name, nikki, rank1, rank2 string, point1, point2 *int) ([]in
 		rank2,
 		formatPoint(point2),
 		timestamp,
+		strings.Join(photos, ","),
 	}
 	return row, rowName, nil
 }
@@ -268,7 +278,7 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row, _, err := buildRow(req.Date, req.Name, req.Nikki, req.Rank1, req.Rank2, req.Point1, req.Point2)
+	row, _, err := buildRow(req.Date, req.Name, req.Nikki, req.Rank1, req.Rank2, req.Point1, req.Point2, req.Photos)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(NikkiResponse{Success: false, Message: err.Error()})
@@ -324,7 +334,7 @@ func handlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 既存行のタイムスタンプを保持する
-	rangeStr := fmt.Sprintf("%s!A%d:G%d", sheetTab, req.RowIndex, req.RowIndex)
+	rangeStr := fmt.Sprintf("%s!A%d:H%d", sheetTab, req.RowIndex, req.RowIndex)
 	existResp, err := srv.Spreadsheets.Values.Get(spreadsheetID, rangeStr).Context(ctx).Do()
 	var timestamp string
 	if err == nil && len(existResp.Values) > 0 && len(existResp.Values[0]) > 6 {
@@ -343,6 +353,7 @@ func handlePut(w http.ResponseWriter, r *http.Request) {
 		req.Rank2,
 		formatPoint(req.Point2),
 		timestamp,
+		strings.Join(req.Photos, ","),
 	}
 	vr := &sheets.ValueRange{Values: [][]interface{}{row}}
 	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, rangeStr, vr).

@@ -5,6 +5,9 @@
   "functions": {
     "api/nikki.go": {
       "maxDuration": 10
+    },
+    "api/photo.go": {
+      "maxDuration": 30
     }
   }
 }

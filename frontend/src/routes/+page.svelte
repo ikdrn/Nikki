@@ -519,7 +519,9 @@
   .ranks { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
   .rank-badge { font-size: 12px; background: #f3f4f6; border: 1px solid #e5e7eb; padding: 2px 10px; border-radius: 6px; }
   .ts { font-size: 11px; color: #9ca3af; margin-top: 8px; text-align: right; }
-  @media print { body { padding: 20px; } }
+  .photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .photos img { max-width: 220px; max-height: 180px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; }
+  @media print { body { padding: 20px; } .photos img { max-width: 180px; max-height: 150px; } }
 </style>
 </head>
 <body>
@@ -542,25 +544,79 @@ ${list
   </div>`
 			: ''
 	}
+  ${
+		e.photos && e.photos.length > 0
+			? `<div class="photos">${e.photos.map((p) => `<img src="${p}" crossorigin="anonymous">`).join('')}</div>`
+			: ''
+	}
   ${e.timestamp ? `<p class="ts">${escHtml(e.timestamp)}</p>` : ''}
 </div>`
 	)
 	.join('')}
+<script>
+  // 画像がすべて読み込まれてから印刷ダイアログを開く
+  window.addEventListener('load', function() {
+    var imgs = document.querySelectorAll('img');
+    if (imgs.length === 0) { window.print(); return; }
+    var remaining = imgs.length;
+    function tryPrint() { if (--remaining === 0) window.print(); }
+    imgs.forEach(function(img) {
+      if (img.complete) tryPrint();
+      else { img.onload = tryPrint; img.onerror = tryPrint; }
+    });
+  });
+<\/script>
 </body>
 </html>`;
 		const win = window.open('', '_blank');
 		if (win) {
 			win.document.write(html);
 			win.document.close();
-			setTimeout(() => win.print(), 400);
 		}
 	}
 
-	function handleExport(type: 'pdf' | 'excel' | 'txt' | 'md') {
+	async function exportPhotos() {
+		const list = getEntriesToExport();
+		const allPhotos: { url: string; filename: string }[] = [];
+		for (const e of list) {
+			if (!e.photos || e.photos.length === 0) continue;
+			const dateStr = e.date.replace(/-/g, '');
+			const title = e.name ? e.name.replace(/[\\/:*?"<>|]/g, '_') : '';
+			const prefix = title ? `${dateStr}_${title}` : dateStr;
+			e.photos.forEach((url, i) => {
+				const ext = url.split('?')[0].split('.').pop() || 'jpg';
+				const filename = e.photos!.length === 1 ? `${prefix}.${ext}` : `${prefix}_${i + 1}.${ext}`;
+				allPhotos.push({ url, filename });
+			});
+		}
+		if (allPhotos.length === 0) {
+			alert('写真がありません');
+			return;
+		}
+		const { default: JSZip } = await import('jszip');
+		const zip = new JSZip();
+		await Promise.all(
+			allPhotos.map(async ({ url, filename }) => {
+				const res = await fetch(url);
+				const blob = await res.blob();
+				zip.file(filename, blob);
+			})
+		);
+		const zipBlob = await zip.generateAsync({ type: 'blob' });
+		const url = URL.createObjectURL(zipBlob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `apex-diary-photos-${todayStr()}.zip`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
+	function handleExport(type: 'pdf' | 'excel' | 'txt' | 'md' | 'photos') {
 		showExportMenu = false;
 		if (type === 'pdf') exportPDF();
 		else if (type === 'excel') exportExcel();
 		else if (type === 'txt') exportTxt();
+		else if (type === 'photos') exportPhotos();
 		else exportMd();
 	}
 
@@ -899,6 +955,7 @@ ${list
 							{#if showExportMenu}
 								<div class="export-menu" transition:fly={{ y: -6, duration: 150 }}>
 									<button on:click={() => handleExport('pdf')}>📄 PDF</button>
+									<button on:click={() => handleExport('photos')}>🖼 写真ZIP</button>
 									<button on:click={() => handleExport('excel')}>📊 Excel</button>
 									<button on:click={() => handleExport('txt')}>📝 テキスト</button>
 									<button on:click={() => handleExport('md')}>📋 Markdown</button>
@@ -926,6 +983,7 @@ ${list
 						{#if showExportMenu}
 							<div class="export-menu export-menu-right" transition:fly={{ y: -6, duration: 150 }}>
 								<button on:click={() => handleExport('pdf')}>📄 PDF</button>
+								<button on:click={() => handleExport('photos')}>🖼 写真ZIP</button>
 								<button on:click={() => handleExport('excel')}>📊 Excel</button>
 								<button on:click={() => handleExport('txt')}>📝 テキスト</button>
 								<button on:click={() => handleExport('md')}>📋 Markdown</button>

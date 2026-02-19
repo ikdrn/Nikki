@@ -566,6 +566,9 @@ ${list
 
 	// ── 写真 ──
 	function photoUrl(fileId: string): string {
+		// 新形式: Cloudinary のフル URL がそのまま格納されている
+		if (fileId.startsWith('http')) return fileId;
+		// 旧形式（後方互換）: Google Drive ファイルID
 		return `https://drive.google.com/uc?export=view&id=${fileId}`;
 	}
 

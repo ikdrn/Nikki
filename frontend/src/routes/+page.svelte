@@ -251,7 +251,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)
 			});
-			const data = await res.json();
+			const data = await safeJson(res);
 			if (data.success) {
 				lastSaveTime = Date.now();
 				showMsg('保存しました', 'success');
@@ -282,10 +282,13 @@
 		try {
 			const res = await fetch(`${API_BASE}/nikki`);
 			if (!res.ok) {
-				const data = await res.json().catch(() => ({}));
-				throw new Error(data.error || `HTTP ${res.status}`);
+				const text = await res.text().catch(() => '');
+				let msg = `HTTP ${res.status}`;
+				try { msg = (JSON.parse(text) as { error?: string }).error || msg; } catch { /* ignore */ }
+				throw new Error(msg);
 			}
-			entries = await res.json();
+			const text = await res.text();
+			entries = JSON.parse(text) as Entry[];
 		} catch (e) {
 			historyError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -309,7 +312,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ row_indices: indices })
 			});
-			const data = await res.json();
+			const data = await safeJson(res);
 			if (data.success) {
 				selectedIndices = new Set();
 				await loadHistory();
@@ -374,7 +377,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)
 			});
-			const data = await res.json();
+			const data = await safeJson(res);
 			if (data.success) {
 				editingEntry = null;
 				await loadHistory();
@@ -566,17 +569,28 @@ ${list
 		return `https://drive.google.com/uc?export=view&id=${fileId}`;
 	}
 
+	async function safeJson(res: Response): Promise<Record<string, unknown>> {
+		const text = await res.text();
+		try {
+			return JSON.parse(text) as Record<string, unknown>;
+		} catch {
+			// Vercel が 413 等をプレーンテキストで返した場合
+			const label = text.slice(0, 120).trim() || `HTTP ${res.status}`;
+			throw new Error(label);
+		}
+	}
+
 	async function uploadPhotos(files: File[]): Promise<string[]> {
 		const fileIds: string[] = [];
 		for (const file of files) {
 			const formData = new FormData();
 			formData.append('photo', file);
 			const res = await fetch(`${API_BASE}/photo`, { method: 'POST', body: formData });
-			const data = await res.json();
+			const data = await safeJson(res);
 			if (data.success && data.file_id) {
-				fileIds.push(data.file_id);
+				fileIds.push(data.file_id as string);
 			} else {
-				throw new Error(data.message || '写真のアップロードに失敗しました');
+				throw new Error((data.message as string) || '写真のアップロードに失敗しました');
 			}
 		}
 		return fileIds;
@@ -594,16 +608,30 @@ ${list
 		editNewPhotoFiles = editNewPhotoFiles.filter((_, i) => i !== index);
 	}
 
+	const MAX_PHOTO_BYTES = 4 * 1024 * 1024; // 4MB (Vercel limit: 4.5MB)
+
+	function validatePhotoFiles(files: File[]): File[] {
+		const oversized = files.filter((f) => f.size > MAX_PHOTO_BYTES);
+		if (oversized.length > 0) {
+			showMsg(
+				`ファイルサイズは4MB以下にしてください（超過: ${oversized.map((f) => f.name).join(', ')}）`,
+				'error'
+			);
+			return files.filter((f) => f.size <= MAX_PHOTO_BYTES);
+		}
+		return files;
+	}
+
 	function handlePhotoInput(e: Event) {
 		const input = e.target as HTMLInputElement;
-		const files = Array.from(input.files ?? []);
+		const files = validatePhotoFiles(Array.from(input.files ?? []));
 		photoFiles = [...photoFiles, ...files].slice(0, 5);
 		input.value = '';
 	}
 
 	function handleEditPhotoInput(e: Event) {
 		const input = e.target as HTMLInputElement;
-		const files = Array.from(input.files ?? []);
+		const files = validatePhotoFiles(Array.from(input.files ?? []));
 		const remaining = 5 - editPhotoIds.length - editNewPhotoFiles.length;
 		editNewPhotoFiles = [...editNewPhotoFiles, ...files.slice(0, remaining)];
 		input.value = '';

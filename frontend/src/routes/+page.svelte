@@ -594,6 +594,21 @@ ${list
 		editNewPhotoFiles = editNewPhotoFiles.filter((_, i) => i !== index);
 	}
 
+	function handlePhotoInput(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const files = Array.from(input.files ?? []);
+		photoFiles = [...photoFiles, ...files].slice(0, 5);
+		input.value = '';
+	}
+
+	function handleEditPhotoInput(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const files = Array.from(input.files ?? []);
+		const remaining = 5 - editPhotoIds.length - editNewPhotoFiles.length;
+		editNewPhotoFiles = [...editNewPhotoFiles, ...files.slice(0, remaining)];
+		input.value = '';
+	}
+
 	// click-outside アクション
 	function clickOutside(node: HTMLElement, cb: () => void) {
 		const handler = (e: MouseEvent) => {
@@ -752,12 +767,7 @@ ${list
 							accept="image/*"
 							multiple
 							style="display:none"
-							on:change={(e) => {
-								const input = e.target as HTMLInputElement;
-								const files = Array.from(input.files ?? []);
-								photoFiles = [...photoFiles, ...files].slice(0, 5);
-								input.value = '';
-							}}
+							on:change={handlePhotoInput}
 						/>
 					{/if}
 				</div>
@@ -989,13 +999,7 @@ ${list
 												accept="image/*"
 												multiple
 												style="display:none"
-												on:change={(e) => {
-													const input = e.target as HTMLInputElement;
-													const files = Array.from(input.files ?? []);
-													const remaining = 5 - editPhotoIds.length - editNewPhotoFiles.length;
-													editNewPhotoFiles = [...editNewPhotoFiles, ...files.slice(0, remaining)];
-													input.value = '';
-												}}
+												on:change={handleEditPhotoInput}
 											/>
 										{/if}
 									</div>

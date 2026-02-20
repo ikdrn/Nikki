@@ -46,6 +46,7 @@
 		point2: string;
 		timestamp: string;
 		photos: string[];
+		feedback: string;
 	}
 
 	let entries: Entry[] = [];
@@ -79,6 +80,12 @@
 	// ── エクスポートメニュー ──
 	let showExportMenu = false;
 
+	// ── フィードバックモーダル ──
+	let feedbackEntry: Entry | null = null;
+	let feedbackPwInput = '';
+	let feedbackText = '';
+	let feedbackSaving = false;
+
 	// ── 出力プレビュー ──
 	let previewType: 'pdf' | 'excel' | 'txt' | 'md' | 'photos' | null = null;
 	let previewList: Entry[] = [];
@@ -99,6 +106,7 @@
 	$: selectedCount = selectedIndices.size;
 	$: allSelected =
 		filteredEntries.length > 0 && filteredEntries.every((e) => selectedIndices.has(e.row_index));
+	$: feedbackUnlocked = feedbackPwInput === '8569';
 
 	// ── 初期化 ──
 	onMount(async () => {
@@ -269,7 +277,7 @@
 				photoFiles = [];
 				entries = [];
 			} else {
-				showMsg(data.message || '保存失敗', 'error');
+				showMsg(String(data.message || '保存失敗'), 'error');
 			}
 		} catch (e) {
 			uploadingPhotos = false;
@@ -686,6 +694,46 @@ ${list
 		else if (type === 'txt') await exportTxt(list);
 		else if (type === 'md') await exportMd(list);
 		else await exportPhotosForList(list);
+	}
+
+	// ── フィードバック ──
+
+	function openFeedback(entry: Entry) {
+		feedbackEntry = entry;
+		feedbackPwInput = '';
+		feedbackText = entry.feedback || '';
+		feedbackSaving = false;
+	}
+
+	function closeFeedback() {
+		feedbackEntry = null;
+		feedbackPwInput = '';
+	}
+
+	async function saveFeedback() {
+		if (!feedbackEntry || !feedbackUnlocked) return;
+		feedbackSaving = true;
+		try {
+			const res = await fetch(`${API_BASE}/nikki`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ row_index: feedbackEntry.row_index, feedback: feedbackText })
+			});
+			const data = await safeJson(res);
+			if (data.success) {
+				const saved = feedbackText;
+				const idx = feedbackEntry.row_index;
+				entries = entries.map((e) => (e.row_index === idx ? { ...e, feedback: saved } : e));
+				showMsg('フィードバックを保存しました', 'success');
+				closeFeedback();
+			} else {
+				showMsg(data.message || '保存失敗', 'error');
+			}
+		} catch (e) {
+			showMsg(`通信エラー: ${e instanceof Error ? e.message : String(e)}`, 'error');
+		} finally {
+			feedbackSaving = false;
+		}
 	}
 
 	// ── 写真 ──
@@ -1189,6 +1237,12 @@ ${list
 										{/if}
 										<div class="entry-actions">
 											<button
+												class="action-btn feedback-btn"
+												class:has-feedback={!!entry.feedback}
+												title="フィードバック"
+												on:click|stopPropagation={() => openFeedback(entry)}
+											>💬</button>
+											<button
 												class="action-btn edit-btn"
 												title="編集"
 												on:click|stopPropagation={() => startEdit(entry)}
@@ -1232,6 +1286,13 @@ ${list
 													/>
 												</a>
 											{/each}
+										</div>
+									{/if}
+
+									{#if entry.feedback}
+										<div class="entry-feedback" on:click|stopPropagation={() => openFeedback(entry)} role="button" tabindex="0" on:keypress|stopPropagation>
+											<span class="entry-feedback-label">💬 フィードバック</span>
+											<p class="entry-feedback-text">{entry.feedback}</p>
 										</div>
 									{/if}
 
@@ -1355,6 +1416,66 @@ ${list
 				<button class="pv-btn-export" on:click={confirmExport}>
 					{previewFormatIcon(previewType)} このまま出力する
 				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- フィードバックモーダル -->
+{#if feedbackEntry !== null}
+	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+	<div class="preview-overlay" on:click|self={closeFeedback}>
+		<div class="preview-modal fb-modal" role="dialog" aria-modal="true">
+			<div class="preview-header">
+				<div class="preview-title-row">
+					<span class="preview-title">フィードバック</span>
+					<span class="preview-format-badge">
+						{fmtDate(feedbackEntry.date)}{feedbackEntry.name ? ' — ' + feedbackEntry.name : ''}
+					</span>
+				</div>
+				<button class="preview-close-btn" on:click={closeFeedback} aria-label="閉じる">✕</button>
+			</div>
+
+			<div class="preview-body">
+				<div class="fb-pw-row">
+					<label class="fb-pw-label" for="fb-pw">パスワード</label>
+					<div class="fb-pw-wrap">
+						<input
+							id="fb-pw"
+							type="password"
+							class="fb-pw-input"
+							bind:value={feedbackPwInput}
+							placeholder="パスワードを入力"
+							maxlength="10"
+						/>
+						{#if feedbackPwInput.length > 0}
+							<span class="fb-pw-status" class:ok={feedbackUnlocked}>
+								{feedbackUnlocked ? '✓ 解除' : '✗'}
+							</span>
+						{/if}
+					</div>
+				</div>
+
+				<textarea
+					class="fb-textarea"
+					bind:value={feedbackText}
+					disabled={!feedbackUnlocked}
+					placeholder={feedbackUnlocked ? 'フィードバックを入力...' : 'パスワードを入力するとフィードバックを編集できます'}
+					rows="6"
+				></textarea>
+			</div>
+
+			<div class="preview-footer">
+				<button class="pv-btn-cancel" on:click={closeFeedback}>キャンセル</button>
+				{#if feedbackUnlocked}
+					<button
+						class="pv-btn-export"
+						on:click={saveFeedback}
+						disabled={feedbackSaving}
+					>
+						{feedbackSaving ? '保存中...' : '💾 保存'}
+					</button>
+				{/if}
 			</div>
 		</div>
 	</div>
@@ -2648,5 +2769,120 @@ ${list
 		font-size: 14px;
 		text-align: center;
 		padding: 48px 0;
+	}
+
+	/* ── フィードバック ── */
+	.feedback-btn {
+		opacity: 0.45;
+		transition: opacity 0.15s;
+	}
+
+	.feedback-btn:hover,
+	.feedback-btn.has-feedback {
+		opacity: 1;
+	}
+
+	.entry-feedback {
+		margin-top: 10px;
+		padding: 8px 12px;
+		background: #eff6ff;
+		border-left: 3px solid #3b82f6;
+		border-radius: 0 6px 6px 0;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+
+	.entry-feedback:hover {
+		background: #dbeafe;
+	}
+
+	.entry-feedback-label {
+		display: block;
+		font-size: 10px;
+		font-weight: 700;
+		color: #3b82f6;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 3px;
+	}
+
+	.entry-feedback-text {
+		font-size: 13px;
+		color: #1e40af;
+		white-space: pre-wrap;
+		line-height: 1.6;
+	}
+
+	/* フィードバックモーダル */
+	.fb-modal {
+		max-width: 500px;
+	}
+
+	.fb-pw-row {
+		margin-bottom: 14px;
+	}
+
+	.fb-pw-label {
+		display: block;
+		font-size: 12px;
+		font-weight: 600;
+		color: #374151;
+		margin-bottom: 6px;
+	}
+
+	.fb-pw-wrap {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.fb-pw-input {
+		flex: 1;
+		padding: 8px 12px;
+		border: 1px solid #d1d5db;
+		border-radius: 7px;
+		font-size: 14px;
+		outline: none;
+		transition: border-color 0.15s;
+	}
+
+	.fb-pw-input:focus {
+		border-color: #3b82f6;
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+	}
+
+	.fb-pw-status {
+		font-size: 13px;
+		font-weight: 600;
+		color: #ef4444;
+		white-space: nowrap;
+	}
+
+	.fb-pw-status.ok {
+		color: #22c55e;
+	}
+
+	.fb-textarea {
+		width: 100%;
+		padding: 10px 12px;
+		border: 1px solid #d1d5db;
+		border-radius: 7px;
+		font-size: 14px;
+		font-family: inherit;
+		line-height: 1.65;
+		resize: vertical;
+		outline: none;
+		transition: border-color 0.15s, background 0.15s;
+	}
+
+	.fb-textarea:focus {
+		border-color: #3b82f6;
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+	}
+
+	.fb-textarea:disabled {
+		background: #f9fafb;
+		color: #9ca3af;
+		cursor: not-allowed;
 	}
 </style>

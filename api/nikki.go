@@ -61,6 +61,7 @@ type Entry struct {
 	Point2    string   `json:"point2"`
 	Timestamp string   `json:"timestamp"`
 	Photos    []string `json:"photos"`
+	Feedback  string   `json:"feedback"`
 }
 
 func generateRowName(date, name string) (string, error) {
@@ -135,6 +136,9 @@ func parseEntry(sheetRow int, row []interface{}) (Entry, bool) {
 			e.Photos = strings.Split(photosStr, ",")
 		}
 	}
+	if len(row) > 8 {
+		e.Feedback = cellStr(row[8])
+	}
 	return e, true
 }
 
@@ -173,7 +177,7 @@ func readEntries(ctx context.Context) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := srv.Spreadsheets.Values.Get(spreadsheetID, sheetTab+"!A:H").Context(ctx).Do()
+	resp, err := srv.Spreadsheets.Values.Get(spreadsheetID, sheetTab+"!A:I").Context(ctx).Do()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read sheet: %w", err)
 	}
@@ -224,7 +228,7 @@ func buildRow(date, name, nikki, rank1, rank2 string, point1, point2 *int, photo
 // Handler は Vercel サーバーレス関数のエントリーポイント。
 func Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Content-Type", "application/json")
 
@@ -240,6 +244,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		handlePost(w, r)
 	case http.MethodPut:
 		handlePut(w, r)
+	case http.MethodPatch:
+		handlePatch(w, r)
 	case http.MethodDelete:
 		handleDelete(w, r)
 	default:
@@ -366,6 +372,46 @@ func handlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(NikkiResponse{Success: true, Message: "更新しました"})
+}
+
+// handlePatch はフィードバックのみを更新する（I列）。
+func handlePatch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RowIndex int    `json:"row_index"`
+		Feedback string `json:"feedback"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(NikkiResponse{Success: false, Message: "invalid JSON"})
+		return
+	}
+	if req.RowIndex <= 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(NikkiResponse{Success: false, Message: "invalid row_index"})
+		return
+	}
+
+	ctx := r.Context()
+	srv, spreadsheetID, err := newSheetsService(ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(NikkiResponse{Success: false, Message: err.Error()})
+		return
+	}
+
+	// I列（index 8）= feedback のみを更新
+	rangeStr := fmt.Sprintf("%s!I%d", sheetTab, req.RowIndex)
+	vr := &sheets.ValueRange{Values: [][]interface{}{{req.Feedback}}}
+	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, rangeStr, vr).
+		ValueInputOption("USER_ENTERED").Context(ctx).Do()
+	if err != nil {
+		log.Printf("feedback update error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(NikkiResponse{Success: false, Message: "フィードバック保存失敗"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(NikkiResponse{Success: true, Message: "フィードバックを保存しました"})
 }
 
 func handleDelete(w http.ResponseWriter, r *http.Request) {

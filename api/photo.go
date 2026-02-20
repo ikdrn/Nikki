@@ -2,12 +2,18 @@ package handler
 
 import (
 	"bytes"
+	"context"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
+	"regexp"
+	"strings"
+	"time"
 )
 
 // PhotoUploadResponse は写真アップロードの結果を表す。
@@ -26,8 +32,13 @@ type cloudinaryUploadResp struct {
 	} `json:"error,omitempty"`
 }
 
+// Cloudinary URL から public_id を抽出する正規表現
+// 例: https://res.cloudinary.com/{cloud}/image/upload/v1234567890/folder/image.jpg
+//
+//	→ public_id = "folder/image"
+var rePublicID = regexp.MustCompile(`/v\d+/(.+)\.[^./]+$`)
+
 // Handler は /api/photo の Vercel サーバーレス関数エントリーポイント。
-// Cloudinary を使って画像をアップロードする。
 func Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS")
@@ -43,9 +54,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		handlePhotoUpload(w, r)
 	case http.MethodDelete:
-		// Cloudinary 上のファイルは Cloudinary ダッシュボードから管理。
-		// シート側のIDは nikki.go の DELETE で削除済みのため、ここでは成功を返す。
-		json.NewEncoder(w).Encode(PhotoUploadResponse{Success: true, Message: "削除しました"})
+		handlePhotoDelete(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		json.NewEncoder(w).Encode(PhotoUploadResponse{Success: false, Message: "method not allowed"})
@@ -131,10 +140,72 @@ func handlePhotoUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// file_id としてフルURLを保存することで、将来のストレージ変更にも柔軟に対応できる
+	// file_id としてフルURLを保存することで将来のストレージ変更にも対応できる
 	json.NewEncoder(w).Encode(PhotoUploadResponse{
 		Success: true,
 		FileID:  cldResp.SecureURL,
 		URL:     cldResp.SecureURL,
 	})
+}
+
+// handlePhotoDelete は Cloudinary から指定した写真を削除する。
+// リクエストボディ: {"urls": ["https://res.cloudinary.com/..."]}
+func handlePhotoDelete(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		URLs []string `json:"urls"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.URLs) == 0 {
+		json.NewEncoder(w).Encode(PhotoUploadResponse{Success: true})
+		return
+	}
+
+	cloudName := os.Getenv("CLOUDINARY_CLOUD_NAME")
+	apiKey := os.Getenv("CLOUDINARY_API_KEY")
+	apiSecret := os.Getenv("CLOUDINARY_API_SECRET")
+	if cloudName == "" || apiKey == "" || apiSecret == "" {
+		// 認証情報が未設定の場合はスキップ（アップロードプリセットのみで運用中など）
+		json.NewEncoder(w).Encode(PhotoUploadResponse{Success: true})
+		return
+	}
+
+	for _, imgURL := range body.URLs {
+		m := rePublicID.FindStringSubmatch(imgURL)
+		if len(m) < 2 {
+			continue
+		}
+		deleteFromCloudinary(r.Context(), cloudName, apiKey, apiSecret, m[1])
+	}
+
+	json.NewEncoder(w).Encode(PhotoUploadResponse{Success: true})
+}
+
+// deleteFromCloudinary は Cloudinary の destroy API を呼び出して画像を削除する。
+// 失敗してもサイレントにスキップする（ベストエフォート）。
+func deleteFromCloudinary(ctx context.Context, cloudName, apiKey, apiSecret, publicID string) {
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+
+	// 署名 = SHA1("public_id={id}&timestamp={ts}{secret}")
+	sigStr := fmt.Sprintf("public_id=%s&timestamp=%s%s", publicID, timestamp, apiSecret)
+	h := sha1.New()
+	h.Write([]byte(sigStr))
+	signature := fmt.Sprintf("%x", h.Sum(nil))
+
+	form := url.Values{}
+	form.Set("public_id", publicID)
+	form.Set("timestamp", timestamp)
+	form.Set("api_key", apiKey)
+	form.Set("signature", signature)
+
+	destroyURL := fmt.Sprintf("https://api.cloudinary.com/v1_1/%s/image/destroy", cloudName)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, destroyURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
 }

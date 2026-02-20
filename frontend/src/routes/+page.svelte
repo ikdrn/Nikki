@@ -306,6 +306,10 @@
 	// ── 削除 ──
 	async function deleteEntries(indices: number[]) {
 		if (!confirm(`${indices.length}件を削除しますか？この操作は取り消せません。`)) return;
+		// 削除対象エントリーの写真URLを事前に収集
+		const photoUrls: string[] = entries
+			.filter((e) => indices.includes(e.row_index))
+			.flatMap((e) => e.photos || []);
 		try {
 			const res = await fetch(`${API_BASE}/nikki`, {
 				method: 'DELETE',
@@ -314,6 +318,14 @@
 			});
 			const data = await safeJson(res);
 			if (data.success) {
+				// Cloudinaryからも写真を削除（バックグラウンド実行・エラー無視）
+				if (photoUrls.length > 0) {
+					fetch(`${API_BASE}/photo`, {
+						method: 'DELETE',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ urls: photoUrls })
+					}).catch(() => {});
+				}
 				selectedIndices = new Set();
 				await loadHistory();
 			} else {
@@ -435,7 +447,49 @@
 		return new Date().toISOString().split('T')[0];
 	}
 
-	function exportTxt() {
+	function blobToDataUrl(blob: Blob): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(reader.result as string);
+			reader.onerror = reject;
+			reader.readAsDataURL(blob);
+		});
+	}
+
+	// 写真ZIPを生成してダウンロードする（list が空や写真なしの場合は何もしない）
+	async function exportPhotosForList(list: Entry[]) {
+		const allPhotos: { url: string; filename: string }[] = [];
+		for (const e of list) {
+			if (!e.photos || e.photos.length === 0) continue;
+			const dateStr = e.date.replace(/-/g, '');
+			const title = e.name ? e.name.replace(/[\\/:*?"<>|]/g, '_') : '';
+			const prefix = title ? `${dateStr}_${title}` : dateStr;
+			e.photos.forEach((url, i) => {
+				const ext = url.split('?')[0].split('.').pop() || 'jpg';
+				const filename = e.photos!.length === 1 ? `${prefix}.${ext}` : `${prefix}_${i + 1}.${ext}`;
+				allPhotos.push({ url, filename });
+			});
+		}
+		if (allPhotos.length === 0) return;
+		const { default: JSZip } = await import('jszip');
+		const zip = new JSZip();
+		await Promise.all(
+			allPhotos.map(async ({ url, filename }) => {
+				const res = await fetch(url);
+				const blob = await res.blob();
+				zip.file(filename, blob);
+			})
+		);
+		const zipBlob = await zip.generateAsync({ type: 'blob' });
+		const zipUrl = URL.createObjectURL(zipBlob);
+		const a = document.createElement('a');
+		a.href = zipUrl;
+		a.download = `apex-diary-photos-${todayStr()}.zip`;
+		a.click();
+		URL.revokeObjectURL(zipUrl);
+	}
+
+	async function exportTxt() {
 		const list = getEntriesToExport();
 		const content = list
 			.map((e) => {
@@ -454,9 +508,10 @@
 			})
 			.join('\n\n');
 		downloadBlob(content, `apex-diary-${todayStr()}.txt`, 'text/plain;charset=utf-8');
+		await exportPhotosForList(list);
 	}
 
-	function exportMd() {
+	async function exportMd() {
 		const list = getEntriesToExport();
 		const header = `# Apex成長日記\n\n出力日: ${fmtDate(todayStr())}\n\n---\n\n`;
 		const body = list
@@ -479,6 +534,7 @@
 			})
 			.join('\n\n');
 		downloadBlob(header + body, `apex-diary-${todayStr()}.md`, 'text/markdown;charset=utf-8');
+		await exportPhotosForList(list);
 	}
 
 	async function exportExcel() {
@@ -493,13 +549,31 @@
 		const wb = XLSX.utils.book_new();
 		XLSX.utils.book_append_sheet(wb, ws, '日記');
 		XLSX.writeFile(wb, `apex-diary-${todayStr()}.xlsx`);
+		await exportPhotosForList(list);
 	}
 
-	function exportPDF() {
+	async function exportPDF() {
 		const list = getEntriesToExport();
 		const today = fmtDate(todayStr());
 		const escHtml = (s: string) =>
 			s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+		// 写真を全て base64 data URL に変換してから HTML に埋め込む
+		// （外部URLのまま印刷ウィンドウに渡すと読み込まれない場合があるため）
+		const imageCache = new Map<string, string>();
+		const allPhotoUrls = [...new Set(list.flatMap((e) => e.photos || []))];
+		await Promise.all(
+			allPhotoUrls.map(async (url) => {
+				try {
+					const res = await fetch(url);
+					const blob = await res.blob();
+					imageCache.set(url, await blobToDataUrl(blob));
+				} catch {
+					imageCache.set(url, url); // フェッチ失敗時は元URLにフォールバック
+				}
+			})
+		);
+
 		const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -546,69 +620,31 @@ ${list
 	}
   ${
 		e.photos && e.photos.length > 0
-			? `<div class="photos">${e.photos.map((p) => `<img src="${p}" crossorigin="anonymous">`).join('')}</div>`
+			? `<div class="photos">${e.photos.map((p) => `<img src="${imageCache.get(p) || p}">`).join('')}</div>`
 			: ''
 	}
   ${e.timestamp ? `<p class="ts">${escHtml(e.timestamp)}</p>` : ''}
 </div>`
 	)
 	.join('')}
-<script>
-  // 画像がすべて読み込まれてから印刷ダイアログを開く
-  window.addEventListener('load', function() {
-    var imgs = document.querySelectorAll('img');
-    if (imgs.length === 0) { window.print(); return; }
-    var remaining = imgs.length;
-    function tryPrint() { if (--remaining === 0) window.print(); }
-    imgs.forEach(function(img) {
-      if (img.complete) tryPrint();
-      else { img.onload = tryPrint; img.onerror = tryPrint; }
-    });
-  });
-<\/script>
 </body>
 </html>`;
 		const win = window.open('', '_blank');
 		if (win) {
 			win.document.write(html);
 			win.document.close();
+			// data URL 埋め込み済みなので短い待機で十分
+			setTimeout(() => win.print(), 300);
 		}
 	}
 
 	async function exportPhotos() {
 		const list = getEntriesToExport();
-		const allPhotos: { url: string; filename: string }[] = [];
-		for (const e of list) {
-			if (!e.photos || e.photos.length === 0) continue;
-			const dateStr = e.date.replace(/-/g, '');
-			const title = e.name ? e.name.replace(/[\\/:*?"<>|]/g, '_') : '';
-			const prefix = title ? `${dateStr}_${title}` : dateStr;
-			e.photos.forEach((url, i) => {
-				const ext = url.split('?')[0].split('.').pop() || 'jpg';
-				const filename = e.photos!.length === 1 ? `${prefix}.${ext}` : `${prefix}_${i + 1}.${ext}`;
-				allPhotos.push({ url, filename });
-			});
-		}
-		if (allPhotos.length === 0) {
+		if (!list.some((e) => e.photos && e.photos.length > 0)) {
 			alert('写真がありません');
 			return;
 		}
-		const { default: JSZip } = await import('jszip');
-		const zip = new JSZip();
-		await Promise.all(
-			allPhotos.map(async ({ url, filename }) => {
-				const res = await fetch(url);
-				const blob = await res.blob();
-				zip.file(filename, blob);
-			})
-		);
-		const zipBlob = await zip.generateAsync({ type: 'blob' });
-		const url = URL.createObjectURL(zipBlob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `apex-diary-photos-${todayStr()}.zip`;
-		a.click();
-		URL.revokeObjectURL(url);
+		await exportPhotosForList(list);
 	}
 
 	function handleExport(type: 'pdf' | 'excel' | 'txt' | 'md' | 'photos') {

@@ -1436,33 +1436,61 @@ ${list
 				<button class="preview-close-btn" on:click={closeFeedback} aria-label="閉じる">✕</button>
 			</div>
 
-			<div class="preview-body">
-				<div class="fb-pw-row">
-					<label class="fb-pw-label" for="fb-pw">パスワード</label>
-					<div class="fb-pw-wrap">
-						<input
-							id="fb-pw"
-							type="password"
-							class="fb-pw-input"
-							bind:value={feedbackPwInput}
-							placeholder="パスワードを入力"
-							maxlength="10"
-						/>
-						{#if feedbackPwInput.length > 0}
-							<span class="fb-pw-status" class:ok={feedbackUnlocked}>
-								{feedbackUnlocked ? '✓ 解除' : '✗'}
-							</span>
-						{/if}
-					</div>
+			<div class="preview-body fb-body">
+				<!-- 左: 日記参照 -->
+				<div class="fb-ref">
+					<p class="fb-ref-label">📖 日記</p>
+					{#if feedbackEntry.nikki}
+						<p class="fb-ref-nikki">{feedbackEntry.nikki}</p>
+					{/if}
+					{#if feedbackEntry.rank1 || feedbackEntry.rank2}
+						<div class="fb-ref-ranks">
+							{#if feedbackEntry.rank1}
+								<span class="pv-rank">{feedbackEntry.rank1}{feedbackEntry.point1 ? ' ' + feedbackEntry.point1 : ''}</span>
+							{/if}
+							{#if feedbackEntry.rank2}
+								<span class="pv-rank">{feedbackEntry.rank2}{feedbackEntry.point2 ? ' ' + feedbackEntry.point2 : ''}</span>
+							{/if}
+						</div>
+					{/if}
+					{#if feedbackEntry.photos && feedbackEntry.photos.length > 0}
+						<div class="fb-ref-photos">
+							{#each feedbackEntry.photos as photo}
+								<img src={photoUrl(photo)} alt="写真" class="fb-ref-photo" loading="lazy" />
+							{/each}
+						</div>
+					{/if}
 				</div>
 
-				<textarea
-					class="fb-textarea"
-					bind:value={feedbackText}
-					disabled={!feedbackUnlocked}
-					placeholder={feedbackUnlocked ? 'フィードバックを入力...' : 'パスワードを入力するとフィードバックを編集できます'}
-					rows="6"
-				></textarea>
+				<!-- 右: フィードバック入力 -->
+				<div class="fb-input-col">
+					<div class="fb-pw-row">
+						<label class="fb-pw-label" for="fb-pw">パスワード</label>
+						<div class="fb-pw-wrap">
+							<input
+								id="fb-pw"
+								type="password"
+								class="fb-pw-input"
+								bind:value={feedbackPwInput}
+								placeholder="パスワードを入力"
+								maxlength="10"
+							/>
+							{#if feedbackPwInput.length > 0}
+								<span class="fb-pw-status" class:ok={feedbackUnlocked}>
+									{feedbackUnlocked ? '✓ 解除' : '✗'}
+								</span>
+							{/if}
+						</div>
+					</div>
+
+					<textarea
+						class="fb-textarea"
+						bind:value={feedbackText}
+						disabled={!feedbackUnlocked}
+						placeholder={feedbackUnlocked ? 'フィードバックを入力...' : 'パスワードを入力するとフィードバックを編集できます'}
+						rows="8"
+					></textarea>
+				</div>
 			</div>
 
 			<div class="preview-footer">
@@ -2815,7 +2843,73 @@ ${list
 
 	/* フィードバックモーダル */
 	.fb-modal {
-		max-width: 500px;
+		max-width: 860px;
+	}
+
+	.fb-body {
+		display: flex;
+		gap: 18px;
+		align-items: flex-start;
+		padding: 16px 20px;
+	}
+
+	/* 左: 日記参照パネル */
+	.fb-ref {
+		flex: 1 1 0;
+		min-width: 0;
+		max-height: 60vh;
+		overflow-y: auto;
+		padding: 14px 16px;
+		background: #f8fafc;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+	}
+
+	.fb-ref-label {
+		font-size: 11px;
+		font-weight: 700;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 10px;
+	}
+
+	.fb-ref-nikki {
+		font-size: 13px;
+		line-height: 1.75;
+		color: #1f2937;
+		white-space: pre-wrap;
+	}
+
+	.fb-ref-ranks {
+		display: flex;
+		gap: 6px;
+		flex-wrap: wrap;
+		margin-top: 10px;
+	}
+
+	.fb-ref-photos {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-top: 10px;
+	}
+
+	.fb-ref-photo {
+		width: 90px;
+		height: 72px;
+		object-fit: cover;
+		border-radius: 5px;
+		border: 1px solid #e5e7eb;
+	}
+
+	/* 右: フィードバック入力パネル */
+	.fb-input-col {
+		flex: 1 1 0;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
 
 	.fb-pw-row {

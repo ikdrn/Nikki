@@ -79,6 +79,10 @@
 	// ── エクスポートメニュー ──
 	let showExportMenu = false;
 
+	// ── 出力プレビュー ──
+	let previewType: 'pdf' | 'excel' | 'txt' | 'md' | 'photos' | null = null;
+	let previewList: Entry[] = [];
+
 	// ── リアクティブ ──
 	$: filteredEntries = entries
 		.filter((e) => {
@@ -456,18 +460,78 @@
 		});
 	}
 
-	// 写真ZIPを生成してダウンロードする（list が空や写真なしの場合は何もしない）
+	// ── コンテンツ生成ヘルパー（プレビューと実出力で共有） ──
+
+	function buildTxtContent(list: Entry[]): string {
+		return list
+			.map((e) => {
+				const lines = [
+					'='.repeat(40),
+					`日付: ${fmtDate(e.date)}`,
+					e.name ? `タイトル: ${e.name}` : null,
+					'',
+					e.nikki,
+					'',
+					e.rank1 ? `ランク1: ${e.rank1}${e.point1 ? ' ' + e.point1 : ''}` : null,
+					e.rank2 ? `ランク2: ${e.rank2}${e.point2 ? ' ' + e.point2 : ''}` : null,
+					e.timestamp ? `記録日時: ${e.timestamp}` : null
+				].filter((l) => l !== null);
+				return lines.join('\n');
+			})
+			.join('\n\n');
+	}
+
+	function buildMdContent(list: Entry[]): string {
+		const header = `# Apex成長日記\n\n出力日: ${fmtDate(todayStr())}\n\n---\n\n`;
+		const body = list
+			.map((e) => {
+				const parts: string[] = [
+					`## ${fmtDate(e.date)}${e.name ? ' — ' + e.name : ''}`,
+					'',
+					e.nikki,
+					''
+				];
+				if (e.rank1 || e.rank2) {
+					parts.push('**ランク情報**');
+					if (e.rank1) parts.push(`- ランク1: ${e.rank1}${e.point1 ? ' ' + e.point1 : ''}`);
+					if (e.rank2) parts.push(`- ランク2: ${e.rank2}${e.point2 ? ' ' + e.point2 : ''}`);
+					parts.push('');
+				}
+				if (e.timestamp) parts.push(`*記録日時: ${e.timestamp}*`);
+				parts.push('---');
+				return parts.join('\n');
+			})
+			.join('\n\n');
+		return header + body;
+	}
+
+	function photoFilename(e: Entry, idx: number): string {
+		const dateStr = e.date.replace(/-/g, '');
+		const title = e.name ? e.name.replace(/[\\/:*?"<>|]/g, '_') : '';
+		const prefix = title ? `${dateStr}_${title}` : dateStr;
+		const url = e.photos![idx];
+		const ext = url.split('?')[0].split('.').pop() || 'jpg';
+		return e.photos!.length === 1 ? `${prefix}.${ext}` : `${prefix}_${idx + 1}.${ext}`;
+	}
+
+	function previewFormatName(type: string): string {
+		const map: Record<string, string> = { pdf: 'PDF', excel: 'Excel', txt: 'テキスト', md: 'Markdown', photos: '写真ZIP' };
+		return map[type] ?? type;
+	}
+
+	function previewFormatIcon(type: string): string {
+		const map: Record<string, string> = { pdf: '📄', excel: '📊', txt: '📝', md: '📋', photos: '🖼' };
+		return map[type] ?? '⬇';
+	}
+
+	// ── 写真ZIP共通ヘルパー ──
+
 	async function exportPhotosForList(list: Entry[]) {
 		const allPhotos: { url: string; filename: string }[] = [];
 		for (const e of list) {
 			if (!e.photos || e.photos.length === 0) continue;
-			const dateStr = e.date.replace(/-/g, '');
-			const title = e.name ? e.name.replace(/[\\/:*?"<>|]/g, '_') : '';
-			const prefix = title ? `${dateStr}_${title}` : dateStr;
 			e.photos.forEach((url, i) => {
-				const ext = url.split('?')[0].split('.').pop() || 'jpg';
-				const filename = e.photos!.length === 1 ? `${prefix}.${ext}` : `${prefix}_${i + 1}.${ext}`;
-				allPhotos.push({ url, filename });
+				allPhotos.push({ url, filename: photoFilename(e, i) });
 			});
 		}
 		if (allPhotos.length === 0) return;
@@ -489,56 +553,19 @@
 		URL.revokeObjectURL(zipUrl);
 	}
 
-	async function exportTxt() {
-		const list = getEntriesToExport();
-		const content = list
-			.map((e) => {
-				const lines = [
-					'='.repeat(40),
-					`日付: ${fmtDate(e.date)}`,
-					e.name ? `タイトル: ${e.name}` : null,
-					'',
-					e.nikki,
-					'',
-					e.rank1 ? `ランク1: ${e.rank1}${e.point1 ? ' ' + e.point1 : ''}` : null,
-					e.rank2 ? `ランク2: ${e.rank2}${e.point2 ? ' ' + e.point2 : ''}` : null,
-					e.timestamp ? `記録日時: ${e.timestamp}` : null
-				].filter((l) => l !== null);
-				return lines.join('\n');
-			})
-			.join('\n\n');
-		downloadBlob(content, `apex-diary-${todayStr()}.txt`, 'text/plain;charset=utf-8');
+	// ── 実出力関数（list を引数で受け取る） ──
+
+	async function exportTxt(list: Entry[]) {
+		downloadBlob(buildTxtContent(list), `apex-diary-${todayStr()}.txt`, 'text/plain;charset=utf-8');
 		await exportPhotosForList(list);
 	}
 
-	async function exportMd() {
-		const list = getEntriesToExport();
-		const header = `# Apex成長日記\n\n出力日: ${fmtDate(todayStr())}\n\n---\n\n`;
-		const body = list
-			.map((e) => {
-				const parts: string[] = [
-					`## ${fmtDate(e.date)}${e.name ? ' — ' + e.name : ''}`,
-					'',
-					e.nikki,
-					''
-				];
-				if (e.rank1 || e.rank2) {
-					parts.push('**ランク情報**');
-					if (e.rank1) parts.push(`- ランク1: ${e.rank1}${e.point1 ? ' ' + e.point1 : ''}`);
-					if (e.rank2) parts.push(`- ランク2: ${e.rank2}${e.point2 ? ' ' + e.point2 : ''}`);
-					parts.push('');
-				}
-				if (e.timestamp) parts.push(`*記録日時: ${e.timestamp}*`);
-				parts.push('---');
-				return parts.join('\n');
-			})
-			.join('\n\n');
-		downloadBlob(header + body, `apex-diary-${todayStr()}.md`, 'text/markdown;charset=utf-8');
+	async function exportMd(list: Entry[]) {
+		downloadBlob(buildMdContent(list), `apex-diary-${todayStr()}.md`, 'text/markdown;charset=utf-8');
 		await exportPhotosForList(list);
 	}
 
-	async function exportExcel() {
-		const list = getEntriesToExport();
+	async function exportExcel(list: Entry[]) {
 		const xlsxMod = await import('xlsx');
 		const XLSX = xlsxMod.default ?? xlsxMod;
 		const wsData = [
@@ -552,14 +579,12 @@
 		await exportPhotosForList(list);
 	}
 
-	async function exportPDF() {
-		const list = getEntriesToExport();
+	async function exportPDF(list: Entry[]) {
 		const today = fmtDate(todayStr());
 		const escHtml = (s: string) =>
 			s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 		// 写真を全て base64 data URL に変換してから HTML に埋め込む
-		// （外部URLのまま印刷ウィンドウに渡すと読み込まれない場合があるため）
 		const imageCache = new Map<string, string>();
 		const allPhotoUrls = [...new Set(list.flatMap((e) => e.photos || []))];
 		await Promise.all(
@@ -569,7 +594,7 @@
 					const blob = await res.blob();
 					imageCache.set(url, await blobToDataUrl(blob));
 				} catch {
-					imageCache.set(url, url); // フェッチ失敗時は元URLにフォールバック
+					imageCache.set(url, url);
 				}
 			})
 		);
@@ -633,27 +658,34 @@ ${list
 		if (win) {
 			win.document.write(html);
 			win.document.close();
-			// data URL 埋め込み済みなので短い待機で十分
 			setTimeout(() => win.print(), 300);
 		}
 	}
 
-	async function exportPhotos() {
-		const list = getEntriesToExport();
-		if (!list.some((e) => e.photos && e.photos.length > 0)) {
-			alert('写真がありません');
-			return;
-		}
-		await exportPhotosForList(list);
-	}
+	// ── プレビューハンドラー ──
 
 	function handleExport(type: 'pdf' | 'excel' | 'txt' | 'md' | 'photos') {
 		showExportMenu = false;
-		if (type === 'pdf') exportPDF();
-		else if (type === 'excel') exportExcel();
-		else if (type === 'txt') exportTxt();
-		else if (type === 'photos') exportPhotos();
-		else exportMd();
+		previewList = getEntriesToExport();
+		previewType = type;
+	}
+
+	function closePreview() {
+		previewType = null;
+		previewList = [];
+	}
+
+	async function confirmExport() {
+		const type = previewType;
+		const list = [...previewList];
+		previewType = null;
+		previewList = [];
+		if (!type) return;
+		if (type === 'pdf') await exportPDF(list);
+		else if (type === 'excel') await exportExcel(list);
+		else if (type === 'txt') await exportTxt(list);
+		else if (type === 'md') await exportMd(list);
+		else await exportPhotosForList(list);
 	}
 
 	// ── 写真 ──
@@ -1215,6 +1247,118 @@ ${list
 		</div>
 	{/if}
 </main>
+
+<!-- 出力プレビューモーダル -->
+{#if previewType !== null}
+	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+	<div class="preview-overlay" on:click|self={closePreview}>
+		<div class="preview-modal" role="dialog" aria-modal="true">
+			<div class="preview-header">
+				<div class="preview-title-row">
+					<span class="preview-title">出力プレビュー</span>
+					<span class="preview-format-badge">{previewFormatName(previewType)}</span>
+					<span class="preview-count">{previewList.length}件</span>
+				</div>
+				<button class="preview-close-btn" on:click={closePreview} aria-label="閉じる">✕</button>
+			</div>
+
+			<div class="preview-body">
+				{#if previewType === 'pdf'}
+					<!-- PDF プレビュー: 実際のレイアウトに近い形で表示 -->
+					{#each previewList as entry}
+						<div class="pv-entry">
+							<div class="pv-entry-head">
+								<span class="pv-date">{fmtDate(entry.date)}</span>
+								{#if entry.name}<span class="pv-badge">{entry.name}</span>{/if}
+							</div>
+							<p class="pv-nikki">{entry.nikki}</p>
+							{#if entry.rank1 || entry.rank2}
+								<div class="pv-ranks">
+									{#if entry.rank1}<span class="pv-rank">{entry.rank1}{entry.point1 ? ' ' + entry.point1 : ''}</span>{/if}
+									{#if entry.rank2}<span class="pv-rank">{entry.rank2}{entry.point2 ? ' ' + entry.point2 : ''}</span>{/if}
+								</div>
+							{/if}
+							{#if entry.photos && entry.photos.length > 0}
+								<div class="pv-photos">
+									{#each entry.photos as photo}
+										<img class="pv-photo" src={photoUrl(photo)} alt="写真" loading="lazy" />
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{/each}
+				{:else if previewType === 'txt'}
+					<!-- テキストプレビュー -->
+					<pre class="pv-pre">{buildTxtContent(previewList)}</pre>
+				{:else if previewType === 'md'}
+					<!-- Markdown プレビュー -->
+					<pre class="pv-pre">{buildMdContent(previewList)}</pre>
+				{:else if previewType === 'excel'}
+					<!-- Excel プレビュー: テーブル表示 -->
+					<div class="pv-table-wrap">
+						<table class="pv-table">
+							<thead>
+								<tr>
+									<th>日付</th><th>タイトル</th><th>日記</th>
+									<th>ランク1</th><th>RP1</th><th>ランク2</th><th>RP2</th><th>記録日時</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each previewList as e}
+									<tr>
+										<td>{e.date}</td>
+										<td>{e.name}</td>
+										<td class="pv-td-nikki">{e.nikki}</td>
+										<td>{e.rank1}</td>
+										<td>{e.point1}</td>
+										<td>{e.rank2}</td>
+										<td>{e.point2}</td>
+										<td>{e.timestamp}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{:else if previewType === 'photos'}
+					<!-- 写真プレビュー: サムネイル + ファイル名 -->
+					{#if previewList.some((e) => e.photos && e.photos.length > 0)}
+						{#each previewList as entry}
+							{#if entry.photos && entry.photos.length > 0}
+								<div class="pv-photo-group">
+									<h4 class="pv-photo-group-title">
+										{fmtDate(entry.date)}{entry.name ? ' — ' + entry.name : ''}
+									</h4>
+									<div class="pv-photo-grid">
+										{#each entry.photos as photo, i}
+											<div class="pv-photo-item">
+												<img
+													src={photoUrl(photo)}
+													alt="写真"
+													class="pv-photo-thumb"
+													loading="lazy"
+												/>
+												<span class="pv-photo-name">{photoFilename(entry, i)}</span>
+											</div>
+										{/each}
+									</div>
+								</div>
+							{/if}
+						{/each}
+					{:else}
+						<p class="pv-empty">写真がありません</p>
+					{/if}
+				{/if}
+			</div>
+
+			<div class="preview-footer">
+				<button class="pv-btn-cancel" on:click={closePreview}>キャンセル</button>
+				<button class="pv-btn-export" on:click={confirmExport}>
+					{previewFormatIcon(previewType)} このまま出力する
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <!-- トースト通知 -->
 {#if message}
@@ -2216,5 +2360,293 @@ ${list
 		.rank-row .rp-field {
 			flex: 0 0 100px;
 		}
+	}
+
+	/* ── 出力プレビューモーダル ── */
+	.preview-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.55);
+		z-index: 200;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 16px;
+	}
+
+	.preview-modal {
+		background: #fff;
+		border-radius: 14px;
+		width: 100%;
+		max-width: 800px;
+		max-height: 90vh;
+		display: flex;
+		flex-direction: column;
+		box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+	}
+
+	.preview-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 14px 18px;
+		border-bottom: 1px solid #e5e7eb;
+		flex-shrink: 0;
+	}
+
+	.preview-title-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.preview-title {
+		font-size: 15px;
+		font-weight: 700;
+		color: #0c2340;
+	}
+
+	.preview-format-badge {
+		font-size: 11px;
+		background: #e0f2fe;
+		color: #0369a1;
+		padding: 2px 10px;
+		border-radius: 20px;
+		font-weight: 600;
+	}
+
+	.preview-count {
+		font-size: 12px;
+		color: #6b7280;
+	}
+
+	.preview-close-btn {
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-size: 15px;
+		color: #9ca3af;
+		padding: 4px 6px;
+		border-radius: 6px;
+		line-height: 1;
+		transition: background 0.15s;
+	}
+
+	.preview-close-btn:hover {
+		background: #f3f4f6;
+		color: #374151;
+	}
+
+	.preview-body {
+		flex: 1;
+		overflow-y: auto;
+		padding: 18px 20px;
+		min-height: 0;
+	}
+
+	.preview-footer {
+		display: flex;
+		justify-content: flex-end;
+		gap: 10px;
+		padding: 12px 18px;
+		border-top: 1px solid #e5e7eb;
+		flex-shrink: 0;
+		background: #f9fafb;
+		border-radius: 0 0 14px 14px;
+	}
+
+	.pv-btn-cancel {
+		padding: 8px 18px;
+		border: 1px solid #d1d5db;
+		background: #fff;
+		border-radius: 7px;
+		cursor: pointer;
+		font-size: 13px;
+		color: #374151;
+		transition: background 0.15s;
+	}
+
+	.pv-btn-cancel:hover {
+		background: #f3f4f6;
+	}
+
+	.pv-btn-export {
+		padding: 8px 20px;
+		background: #0284c7;
+		color: #fff;
+		border: none;
+		border-radius: 7px;
+		cursor: pointer;
+		font-size: 13px;
+		font-weight: 600;
+		transition: background 0.15s;
+	}
+
+	.pv-btn-export:hover {
+		background: #0369a1;
+	}
+
+	/* PDF プレビュー */
+	.pv-entry {
+		margin-bottom: 20px;
+		padding-bottom: 20px;
+		border-bottom: 1px solid #e5e7eb;
+	}
+
+	.pv-entry:last-child {
+		border-bottom: none;
+	}
+
+	.pv-entry-head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 8px;
+	}
+
+	.pv-date {
+		font-size: 14px;
+		font-weight: 700;
+		color: #0284c7;
+	}
+
+	.pv-badge {
+		font-size: 11px;
+		background: #e0f2fe;
+		color: #0369a1;
+		padding: 2px 8px;
+		border-radius: 20px;
+	}
+
+	.pv-nikki {
+		white-space: pre-wrap;
+		font-size: 13px;
+		line-height: 1.75;
+		color: #1f2937;
+	}
+
+	.pv-ranks {
+		display: flex;
+		gap: 6px;
+		margin-top: 8px;
+		flex-wrap: wrap;
+	}
+
+	.pv-rank {
+		font-size: 12px;
+		background: #f3f4f6;
+		border: 1px solid #e5e7eb;
+		padding: 2px 8px;
+		border-radius: 6px;
+	}
+
+	.pv-photos {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-top: 10px;
+	}
+
+	.pv-photo {
+		max-width: 180px;
+		max-height: 140px;
+		object-fit: cover;
+		border-radius: 6px;
+		border: 1px solid #e5e7eb;
+	}
+
+	/* テキスト / Markdown プレビュー */
+	.pv-pre {
+		font-family: 'Courier New', Courier, monospace;
+		font-size: 12px;
+		white-space: pre-wrap;
+		line-height: 1.65;
+		color: #1f2937;
+	}
+
+	/* Excel プレビュー */
+	.pv-table-wrap {
+		overflow-x: auto;
+	}
+
+	.pv-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 12px;
+	}
+
+	.pv-table th {
+		background: #f1f5f9;
+		padding: 6px 10px;
+		text-align: left;
+		border: 1px solid #e5e7eb;
+		font-weight: 600;
+		white-space: nowrap;
+		color: #374151;
+	}
+
+	.pv-table td {
+		padding: 6px 10px;
+		border: 1px solid #e5e7eb;
+		color: #374151;
+		max-width: 200px;
+		vertical-align: top;
+	}
+
+	.pv-td-nikki {
+		max-width: 260px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* 写真 ZIP プレビュー */
+	.pv-photo-group {
+		margin-bottom: 22px;
+	}
+
+	.pv-photo-group-title {
+		font-size: 13px;
+		font-weight: 600;
+		color: #374151;
+		margin-bottom: 10px;
+	}
+
+	.pv-photo-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px;
+	}
+
+	.pv-photo-item {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 5px;
+	}
+
+	.pv-photo-thumb {
+		width: 120px;
+		height: 100px;
+		object-fit: cover;
+		border-radius: 6px;
+		border: 1px solid #e5e7eb;
+	}
+
+	.pv-photo-name {
+		font-size: 10px;
+		color: #6b7280;
+		max-width: 120px;
+		text-align: center;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.pv-empty {
+		color: #9ca3af;
+		font-size: 14px;
+		text-align: center;
+		padding: 48px 0;
 	}
 </style>

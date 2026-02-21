@@ -17,6 +17,8 @@
 		{ key: 'mental', label: 'メンタル', desc: '焦り、判断の迷い、集中力の低下' }
 	] as const;
 
+	const SIGNER_OPTIONS = ['もぐ太'] as const;
+
 	// ── フォーム ──
 	let date = '';
 	let title = '';
@@ -485,9 +487,19 @@
 		return list
 			.map((e) => {
 				const fbData = parseFeedback(e.feedback);
-				const fbLines = FEEDBACK_CATEGORIES.filter((cat) => fbData[cat.key]).map(
-					(cat) => `[${cat.label}]\n${fbData[cat.key]}`
-				);
+				const hasFb = hasFeedback(fbData);
+				const fbSection: (string | null)[] = hasFb
+					? [
+						'',
+						'【フィードバック】',
+						...(fbData['free'] ? [fbData['free'], ''] : []),
+						...FEEDBACK_CATEGORIES.filter((c) => fbData[c.key]).flatMap((c) => [
+							`[${c.label}]`,
+							fbData[c.key]
+						]),
+						...(fbData['signer'] ? ['', `— ${fbData['signer']}`] : [])
+					  ]
+					: [];
 				const lines = [
 					'='.repeat(40),
 					`日付: ${fmtDate(e.date)}`,
@@ -498,7 +510,7 @@
 					e.rank1 ? `ランク1: ${e.rank1}${e.point1 ? ' ' + e.point1 : ''}` : null,
 					e.rank2 ? `ランク2: ${e.rank2}${e.point2 ? ' ' + e.point2 : ''}` : null,
 					e.timestamp ? `記録日時: ${e.timestamp}` : null,
-					...(fbLines.length > 0 ? ['', '【フィードバック】', ...fbLines] : [])
+					...fbSection
 				].filter((l) => l !== null);
 				return lines.join('\n');
 			})
@@ -523,11 +535,14 @@
 				}
 				if (e.timestamp) parts.push(`*記録日時: ${e.timestamp}*`);
 				const fbData = parseFeedback(e.feedback);
-				const fbCats = FEEDBACK_CATEGORIES.filter((cat) => fbData[cat.key]);
-				if (fbCats.length > 0) {
+				if (hasFeedback(fbData)) {
 					parts.push('');
 					parts.push('**フィードバック**');
-					fbCats.forEach((cat) => parts.push(`- **${cat.label}**: ${fbData[cat.key]}`));
+					if (fbData['free']) parts.push(`> ${fbData['free']}`);
+					FEEDBACK_CATEGORIES.filter((c) => fbData[c.key]).forEach((c) =>
+						parts.push(`- **${c.label}**: ${fbData[c.key]}`)
+					);
+					if (fbData['signer']) parts.push(`*— ${fbData['signer']}*`);
 				}
 				parts.push('---');
 				return parts.join('\n');
@@ -603,10 +618,13 @@
 			['日付', 'タイトル', '日記', 'ランク1', 'RP1', 'ランク2', 'RP2', '記録日時', 'フィードバック'],
 			...list.map((e) => {
 				const fbData = parseFeedback(e.feedback);
-				const fbText = FEEDBACK_CATEGORIES.filter((cat) => fbData[cat.key])
-					.map((cat) => `[${cat.label}] ${fbData[cat.key]}`)
-					.join('\n');
-				return [e.date, e.name, e.nikki, e.rank1, e.point1, e.rank2, e.point2, e.timestamp, fbText];
+				const parts: string[] = [];
+				if (fbData['free']) parts.push(fbData['free']);
+				FEEDBACK_CATEGORIES.filter((c) => fbData[c.key]).forEach((c) =>
+					parts.push(`[${c.label}] ${fbData[c.key]}`)
+				);
+				if (fbData['signer']) parts.push(`— ${fbData['signer']}`);
+				return [e.date, e.name, e.nikki, e.rank1, e.point1, e.rank2, e.point2, e.timestamp, parts.join('\n')];
 			})
 		];
 		const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -659,8 +677,10 @@
   .photos img { max-width: 220px; max-height: 180px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; }
   .feedback { margin-top: 12px; background: #eff6ff; border-left: 3px solid #3b82f6; padding: 8px 12px; border-radius: 0 6px 6px 0; }
   .feedback-title { font-size: 11px; font-weight: 700; color: #1d4ed8; margin-bottom: 5px; }
+  .feedback-free { font-size: 13px; color: #1f2937; white-space: pre-wrap; margin-bottom: 6px; }
   .feedback-cat { margin-bottom: 4px; font-size: 12px; color: #1f2937; white-space: pre-wrap; }
   .feedback-cat-label { font-weight: 700; color: #1e40af; }
+  .feedback-signer { font-size: 12px; color: #4b5563; text-align: right; margin-top: 6px; font-style: italic; }
   @media print { body { padding: 20px; } .photos img { max-width: 180px; max-height: 150px; } }
 </style>
 </head>
@@ -696,8 +716,12 @@ ${list
       { key: 'ability', label: 'アビリティ・アルティメット' }, { key: 'movement', label: 'キャラクターコントロール' },
       { key: 'resources', label: 'リソース管理' }, { key: 'mental', label: 'メンタル' }];
     const filled = cats.filter(c => fbData[c.key]);
-    if (filled.length === 0) return '';
-    return `<div class="feedback"><div class="feedback-title">💬 フィードバック</div>${filled.map(c => `<div class="feedback-cat"><span class="feedback-cat-label">${escHtml(c.label)}: </span>${escHtml(fbData[c.key])}</div>`).join('')}</div>`;
+    const hasFb = fbData.free || filled.length > 0 || fbData.signer;
+    if (!hasFb) return '';
+    const freeHtml = fbData.free ? `<p class="feedback-free">${escHtml(fbData.free)}</p>` : '';
+    const catsHtml = filled.map(c => `<div class="feedback-cat"><span class="feedback-cat-label">${escHtml(c.label)}: </span>${escHtml(fbData[c.key])}</div>`).join('');
+    const signerHtml = fbData.signer ? `<p class="feedback-signer">— ${escHtml(fbData.signer)}</p>` : '';
+    return `<div class="feedback"><div class="feedback-title">💬 フィードバック</div>${freeHtml}${catsHtml}${signerHtml}</div>`;
   })()}
 </div>`
 	)
@@ -752,6 +776,14 @@ ${list
 	function serializeFeedback(data: Record<string, string>): string {
 		const filtered = Object.fromEntries(Object.entries(data).filter(([, v]) => v && v.trim()));
 		return Object.keys(filtered).length > 0 ? JSON.stringify(filtered) : '';
+	}
+
+	function hasFeedback(fbData: Record<string, string>): boolean {
+		return !!(
+			fbData['free'] ||
+			FEEDBACK_CATEGORIES.some((c) => fbData[c.key]) ||
+			fbData['signer']
+		);
 	}
 
 	function openFeedback(entry: Entry) {
@@ -1351,9 +1383,12 @@ ${list
 
 									{#if entry.feedback}
 										{@const fbData = parseFeedback(entry.feedback)}
-										{#if FEEDBACK_CATEGORIES.some((cat) => fbData[cat.key])}
+										{#if hasFeedback(fbData)}
 											<div class="entry-feedback" on:click|stopPropagation={() => openFeedback(entry)} role="button" tabindex="0" on:keypress|stopPropagation>
 												<span class="entry-feedback-label">💬 フィードバック</span>
+												{#if fbData['free']}
+													<p class="entry-feedback-free">{fbData['free']}</p>
+												{/if}
 												{#each FEEDBACK_CATEGORIES as cat}
 													{#if fbData[cat.key]}
 														<div class="entry-feedback-cat">
@@ -1362,6 +1397,9 @@ ${list
 														</div>
 													{/if}
 												{/each}
+												{#if fbData['signer']}
+													<p class="entry-feedback-signer">— {fbData['signer']}</p>
+												{/if}
 											</div>
 										{/if}
 									{/if}
@@ -1418,9 +1456,12 @@ ${list
 							{/if}
 							{#if entry.feedback}
 								{@const pvFbData = parseFeedback(entry.feedback)}
-								{#if FEEDBACK_CATEGORIES.some((c) => pvFbData[c.key])}
+								{#if hasFeedback(pvFbData)}
 									<div class="pv-feedback">
 										<span class="pv-feedback-label">💬 フィードバック</span>
+										{#if pvFbData['free']}
+											<p class="pv-feedback-free">{pvFbData['free']}</p>
+										{/if}
 										{#each FEEDBACK_CATEGORIES as cat}
 											{#if pvFbData[cat.key]}
 												<div class="pv-feedback-cat">
@@ -1429,6 +1470,9 @@ ${list
 												</div>
 											{/if}
 										{/each}
+										{#if pvFbData['signer']}
+											<p class="pv-feedback-signer">— {pvFbData['signer']}</p>
+										{/if}
 									</div>
 								{/if}
 							{/if}
@@ -1452,6 +1496,7 @@ ${list
 							</thead>
 							<tbody>
 								{#each previewList as e}
+									{@const pvExFb = parseFeedback(e.feedback)}
 									<tr>
 										<td>{e.date}</td>
 										<td>{e.name}</td>
@@ -1461,7 +1506,11 @@ ${list
 										<td>{e.rank2}</td>
 										<td>{e.point2}</td>
 										<td>{e.timestamp}</td>
-										<td class="pv-td-feedback">{#each FEEDBACK_CATEGORIES as cat}{#if parseFeedback(e.feedback)[cat.key]}<span class="pv-fb-cat"><strong>{cat.label}</strong>: {parseFeedback(e.feedback)[cat.key]}</span>{/if}{/each}</td>
+										<td class="pv-td-feedback">
+											{#if pvExFb['free']}<span class="pv-fb-cat">{pvExFb['free']}</span>{/if}
+											{#each FEEDBACK_CATEGORIES as cat}{#if pvExFb[cat.key]}<span class="pv-fb-cat"><strong>{cat.label}</strong>: {pvExFb[cat.key]}</span>{/if}{/each}
+											{#if pvExFb['signer']}<span class="pv-fb-cat">— {pvExFb['signer']}</span>{/if}
+										</td>
 									</tr>
 								{/each}
 							</tbody>
@@ -1570,6 +1619,17 @@ ${list
 						</div>
 					</div>
 
+					<div class="fb-free-group">
+						<label class="fb-cat-label">📝 自由欄</label>
+						<textarea
+							class="fb-cat-textarea"
+							bind:value={feedbackData['free']}
+							disabled={!feedbackUnlocked}
+							placeholder={feedbackUnlocked ? '総評や自由コメントを入力...' : ''}
+							rows="3"
+						></textarea>
+					</div>
+
 					<div class="fb-categories">
 						{#each FEEDBACK_CATEGORIES as cat}
 							<div class="fb-cat-group">
@@ -1584,6 +1644,25 @@ ${list
 								></textarea>
 							</div>
 						{/each}
+					</div>
+
+					<div class="fb-signer-group">
+						<label class="fb-signer-label" for="fb-signer">✍️ 署名</label>
+						<div class="fb-signer-wrap">
+							<input
+								id="fb-signer"
+								list="signer-list"
+								class="fb-signer-input"
+								bind:value={feedbackData['signer']}
+								disabled={!feedbackUnlocked}
+								placeholder={feedbackUnlocked ? '名前を入力または選択...' : ''}
+							/>
+							<datalist id="signer-list">
+								{#each SIGNER_OPTIONS as opt}
+									<option value={opt} />
+								{/each}
+							</datalist>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -2945,12 +3024,28 @@ ${list
 		color: #1d4ed8;
 	}
 
+	.entry-feedback-free {
+		font-size: 13px;
+		color: #1e3a5f;
+		white-space: pre-wrap;
+		line-height: 1.6;
+		margin: 4px 0 6px;
+	}
+
 	.entry-feedback-cat-text {
 		font-size: 12px;
 		color: #1e3a5f;
 		white-space: pre-wrap;
 		line-height: 1.5;
 		margin: 1px 0 0;
+	}
+
+	.entry-feedback-signer {
+		font-size: 12px;
+		color: #6b7280;
+		text-align: right;
+		margin-top: 6px;
+		font-style: italic;
 	}
 
 	/* フィードバックモーダル */
@@ -3143,6 +3238,54 @@ ${list
 		cursor: not-allowed;
 	}
 
+	.fb-free-group {
+		padding-bottom: 10px;
+		border-bottom: 1px solid #e5e7eb;
+		margin-bottom: 2px;
+	}
+
+	.fb-signer-group {
+		padding-top: 10px;
+		border-top: 1px solid #e5e7eb;
+		margin-top: 2px;
+	}
+
+	.fb-signer-label {
+		display: block;
+		font-size: 12px;
+		font-weight: 700;
+		color: #374151;
+		margin-bottom: 4px;
+	}
+
+	.fb-signer-wrap {
+		display: flex;
+		gap: 6px;
+		align-items: center;
+	}
+
+	.fb-signer-input {
+		width: 100%;
+		padding: 6px 10px;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		font-size: 14px;
+		font-family: inherit;
+		outline: none;
+		transition: border-color 0.15s;
+	}
+
+	.fb-signer-input:focus {
+		border-color: #3b82f6;
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
+	}
+
+	.fb-signer-input:disabled {
+		background: #f9fafb;
+		color: #9ca3af;
+		cursor: not-allowed;
+	}
+
 /* ── プレビュー内フィードバック ── */
 	.pv-feedback {
 		margin-top: 10px;
@@ -3170,12 +3313,27 @@ ${list
 		color: #1e40af;
 	}
 
+	.pv-feedback-free {
+		font-size: 13px;
+		color: #1f2937;
+		white-space: pre-wrap;
+		margin-bottom: 6px;
+	}
+
 	.pv-feedback-cat-text {
 		font-size: 12px;
 		color: #1f2937;
 		white-space: pre-wrap;
 		line-height: 1.5;
 		margin: 1px 0 0;
+	}
+
+	.pv-feedback-signer {
+		font-size: 12px;
+		color: #6b7280;
+		text-align: right;
+		margin-top: 6px;
+		font-style: italic;
 	}
 
 	.pv-td-feedback {

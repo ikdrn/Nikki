@@ -1,10 +1,21 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { fade, fly, slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
 
 	const RANKS = ['', 'ブロンズ', 'シルバー', 'ゴールド', 'プラチナ', 'ダイヤ', 'マスター', 'プレデター'];
 	const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
+	const FEEDBACK_CATEGORIES = [
+		{ key: 'aim', label: 'エイム・撃ち合い', desc: '命中率、リコイルコントロール、被弾の多さ' },
+		{ key: 'positioning', label: '立ち回り・位置取り', desc: '有利ポジションの確保、遮蔽物の利用、射線管理' },
+		{ key: 'judgment', label: '状況判断', desc: '交戦・撤退のタイミング、漁夫の警戒、リング移動のルート' },
+		{ key: 'teamwork', label: '連携・カバー', desc: '味方との距離感、フォーカス（狙い）合わせ、情報共有・報告' },
+		{ key: 'ability', label: 'アビリティ・アルティメット', desc: '使用タイミング、スキルの無駄撃ち' },
+		{ key: 'movement', label: 'キャラクターコントロール', desc: '被弾を抑える動き、移動・展開のスピード' },
+		{ key: 'resources', label: 'リソース管理', desc: '回復アイテム・弾薬のバランス、漁るスピード' },
+		{ key: 'mental', label: 'メンタル', desc: '焦り、判断の迷い、集中力の低下' }
+	] as const;
 
 	// ── フォーム ──
 	let date = '';
@@ -83,7 +94,7 @@
 	// ── フィードバックモーダル ──
 	let feedbackEntry: Entry | null = null;
 	let feedbackPwInput = '';
-	let feedbackText = '';
+	let feedbackData: Record<string, string> = {};
 	let feedbackSaving = false;
 
 	// ── 出力プレビュー ──
@@ -473,6 +484,10 @@
 	function buildTxtContent(list: Entry[]): string {
 		return list
 			.map((e) => {
+				const fbData = parseFeedback(e.feedback);
+				const fbLines = FEEDBACK_CATEGORIES.filter((cat) => fbData[cat.key]).map(
+					(cat) => `[${cat.label}]\n${fbData[cat.key]}`
+				);
 				const lines = [
 					'='.repeat(40),
 					`日付: ${fmtDate(e.date)}`,
@@ -482,7 +497,8 @@
 					'',
 					e.rank1 ? `ランク1: ${e.rank1}${e.point1 ? ' ' + e.point1 : ''}` : null,
 					e.rank2 ? `ランク2: ${e.rank2}${e.point2 ? ' ' + e.point2 : ''}` : null,
-					e.timestamp ? `記録日時: ${e.timestamp}` : null
+					e.timestamp ? `記録日時: ${e.timestamp}` : null,
+					...(fbLines.length > 0 ? ['', '【フィードバック】', ...fbLines] : [])
 				].filter((l) => l !== null);
 				return lines.join('\n');
 			})
@@ -506,6 +522,13 @@
 					parts.push('');
 				}
 				if (e.timestamp) parts.push(`*記録日時: ${e.timestamp}*`);
+				const fbData = parseFeedback(e.feedback);
+				const fbCats = FEEDBACK_CATEGORIES.filter((cat) => fbData[cat.key]);
+				if (fbCats.length > 0) {
+					parts.push('');
+					parts.push('**フィードバック**');
+					fbCats.forEach((cat) => parts.push(`- **${cat.label}**: ${fbData[cat.key]}`));
+				}
 				parts.push('---');
 				return parts.join('\n');
 			})
@@ -577,8 +600,14 @@
 		const xlsxMod = await import('xlsx');
 		const XLSX = xlsxMod.default ?? xlsxMod;
 		const wsData = [
-			['日付', 'タイトル', '日記', 'ランク1', 'RP1', 'ランク2', 'RP2', '記録日時'],
-			...list.map((e) => [e.date, e.name, e.nikki, e.rank1, e.point1, e.rank2, e.point2, e.timestamp])
+			['日付', 'タイトル', '日記', 'ランク1', 'RP1', 'ランク2', 'RP2', '記録日時', 'フィードバック'],
+			...list.map((e) => {
+				const fbData = parseFeedback(e.feedback);
+				const fbText = FEEDBACK_CATEGORIES.filter((cat) => fbData[cat.key])
+					.map((cat) => `[${cat.label}] ${fbData[cat.key]}`)
+					.join('\n');
+				return [e.date, e.name, e.nikki, e.rank1, e.point1, e.rank2, e.point2, e.timestamp, fbText];
+			})
 		];
 		const ws = XLSX.utils.aoa_to_sheet(wsData);
 		const wb = XLSX.utils.book_new();
@@ -628,6 +657,10 @@
   .ts { font-size: 11px; color: #9ca3af; margin-top: 8px; text-align: right; }
   .photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .photos img { max-width: 220px; max-height: 180px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; }
+  .feedback { margin-top: 12px; background: #eff6ff; border-left: 3px solid #3b82f6; padding: 8px 12px; border-radius: 0 6px 6px 0; }
+  .feedback-title { font-size: 11px; font-weight: 700; color: #1d4ed8; margin-bottom: 5px; }
+  .feedback-cat { margin-bottom: 4px; font-size: 12px; color: #1f2937; white-space: pre-wrap; }
+  .feedback-cat-label { font-weight: 700; color: #1e40af; }
   @media print { body { padding: 20px; } .photos img { max-width: 180px; max-height: 150px; } }
 </style>
 </head>
@@ -657,6 +690,15 @@ ${list
 			: ''
 	}
   ${e.timestamp ? `<p class="ts">${escHtml(e.timestamp)}</p>` : ''}
+  ${(() => { const fbData = (() => { try { return JSON.parse(e.feedback || '{}'); } catch { return {}; } })();
+    const cats = [{ key: 'aim', label: 'エイム・撃ち合い' }, { key: 'positioning', label: '立ち回り・位置取り' },
+      { key: 'judgment', label: '状況判断' }, { key: 'teamwork', label: '連携・カバー' },
+      { key: 'ability', label: 'アビリティ・アルティメット' }, { key: 'movement', label: 'キャラクターコントロール' },
+      { key: 'resources', label: 'リソース管理' }, { key: 'mental', label: 'メンタル' }];
+    const filled = cats.filter(c => fbData[c.key]);
+    if (filled.length === 0) return '';
+    return `<div class="feedback"><div class="feedback-title">💬 フィードバック</div>${filled.map(c => `<div class="feedback-cat"><span class="feedback-cat-label">${escHtml(c.label)}: </span>${escHtml(fbData[c.key])}</div>`).join('')}</div>`;
+  })()}
 </div>`
 	)
 	.join('')}
@@ -698,11 +740,29 @@ ${list
 
 	// ── フィードバック ──
 
+	function parseFeedback(raw: string): Record<string, string> {
+		if (!raw) return {};
+		try {
+			return JSON.parse(raw) as Record<string, string>;
+		} catch {
+			return {};
+		}
+	}
+
+	function serializeFeedback(data: Record<string, string>): string {
+		const filtered = Object.fromEntries(Object.entries(data).filter(([, v]) => v && v.trim()));
+		return Object.keys(filtered).length > 0 ? JSON.stringify(filtered) : '';
+	}
+
 	function openFeedback(entry: Entry) {
 		feedbackEntry = entry;
 		feedbackPwInput = '';
-		feedbackText = entry.feedback || '';
+		feedbackData = parseFeedback(entry.feedback);
 		feedbackSaving = false;
+		tick().then(() => {
+			const el = document.getElementById('fb-pw') as HTMLInputElement | null;
+			el?.focus();
+		});
 	}
 
 	function closeFeedback() {
@@ -713,21 +773,21 @@ ${list
 	async function saveFeedback() {
 		if (!feedbackEntry || !feedbackUnlocked) return;
 		feedbackSaving = true;
+		const feedbackJson = serializeFeedback(feedbackData);
 		try {
 			const res = await fetch(`${API_BASE}/nikki`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ row_index: feedbackEntry.row_index, feedback: feedbackText })
+				body: JSON.stringify({ row_index: feedbackEntry.row_index, feedback: feedbackJson })
 			});
 			const data = await safeJson(res);
 			if (data.success) {
-				const saved = feedbackText;
 				const idx = feedbackEntry.row_index;
-				entries = entries.map((e) => (e.row_index === idx ? { ...e, feedback: saved } : e));
+				entries = entries.map((e) => (e.row_index === idx ? { ...e, feedback: feedbackJson } : e));
 				showMsg('フィードバックを保存しました', 'success');
 				closeFeedback();
 			} else {
-				showMsg(data.message || '保存失敗', 'error');
+				showMsg(String(data.message || '保存失敗'), 'error');
 			}
 		} catch (e) {
 			showMsg(`通信エラー: ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -1241,17 +1301,17 @@ ${list
 												class:has-feedback={!!entry.feedback}
 												title="フィードバック"
 												on:click|stopPropagation={() => openFeedback(entry)}
-											>💬</button>
+											>💬 <span class="btn-label">FB</span></button>
 											<button
 												class="action-btn edit-btn"
 												title="編集"
 												on:click|stopPropagation={() => startEdit(entry)}
-											>✏️</button>
+											>✏️ <span class="btn-label">編集</span></button>
 											<button
 												class="action-btn delete-btn"
 												title="削除"
 												on:click|stopPropagation={() => deleteEntries([entry.row_index])}
-											>🗑️</button>
+											>🗑️ <span class="btn-label">削除</span></button>
 										</div>
 									</div>
 
@@ -1290,10 +1350,20 @@ ${list
 									{/if}
 
 									{#if entry.feedback}
-										<div class="entry-feedback" on:click|stopPropagation={() => openFeedback(entry)} role="button" tabindex="0" on:keypress|stopPropagation>
-											<span class="entry-feedback-label">💬 フィードバック</span>
-											<p class="entry-feedback-text">{entry.feedback}</p>
-										</div>
+										{@const fbData = parseFeedback(entry.feedback)}
+										{#if FEEDBACK_CATEGORIES.some((cat) => fbData[cat.key])}
+											<div class="entry-feedback" on:click|stopPropagation={() => openFeedback(entry)} role="button" tabindex="0" on:keypress|stopPropagation>
+												<span class="entry-feedback-label">💬 フィードバック</span>
+												{#each FEEDBACK_CATEGORIES as cat}
+													{#if fbData[cat.key]}
+														<div class="entry-feedback-cat">
+															<span class="entry-feedback-cat-label">{cat.label}</span>
+															<p class="entry-feedback-cat-text">{fbData[cat.key]}</p>
+														</div>
+													{/if}
+												{/each}
+											</div>
+										{/if}
 									{/if}
 
 									{#if entry.timestamp}
@@ -1346,6 +1416,22 @@ ${list
 									{/each}
 								</div>
 							{/if}
+							{#if entry.feedback}
+								{@const pvFbData = parseFeedback(entry.feedback)}
+								{#if FEEDBACK_CATEGORIES.some((c) => pvFbData[c.key])}
+									<div class="pv-feedback">
+										<span class="pv-feedback-label">💬 フィードバック</span>
+										{#each FEEDBACK_CATEGORIES as cat}
+											{#if pvFbData[cat.key]}
+												<div class="pv-feedback-cat">
+													<span class="pv-feedback-cat-label">{cat.label}</span>
+													<p class="pv-feedback-cat-text">{pvFbData[cat.key]}</p>
+												</div>
+											{/if}
+										{/each}
+									</div>
+								{/if}
+							{/if}
 						</div>
 					{/each}
 				{:else if previewType === 'txt'}
@@ -1361,7 +1447,7 @@ ${list
 							<thead>
 								<tr>
 									<th>日付</th><th>タイトル</th><th>日記</th>
-									<th>ランク1</th><th>RP1</th><th>ランク2</th><th>RP2</th><th>記録日時</th>
+									<th>ランク1</th><th>RP1</th><th>ランク2</th><th>RP2</th><th>記録日時</th><th>フィードバック</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -1375,6 +1461,7 @@ ${list
 										<td>{e.rank2}</td>
 										<td>{e.point2}</td>
 										<td>{e.timestamp}</td>
+										<td class="pv-td-feedback">{#each FEEDBACK_CATEGORIES as cat}{#if parseFeedback(e.feedback)[cat.key]}<span class="pv-fb-cat"><strong>{cat.label}</strong>: {parseFeedback(e.feedback)[cat.key]}</span>{/if}{/each}</td>
 									</tr>
 								{/each}
 							</tbody>
@@ -1483,13 +1570,21 @@ ${list
 						</div>
 					</div>
 
-					<textarea
-						class="fb-textarea"
-						bind:value={feedbackText}
-						disabled={!feedbackUnlocked}
-						placeholder={feedbackUnlocked ? 'フィードバックを入力...' : 'パスワードを入力するとフィードバックを編集できます'}
-						rows="8"
-					></textarea>
+					<div class="fb-categories">
+						{#each FEEDBACK_CATEGORIES as cat}
+							<div class="fb-cat-group">
+								<label class="fb-cat-label">{cat.label}</label>
+								<p class="fb-cat-desc">{cat.desc}</p>
+								<textarea
+									class="fb-cat-textarea"
+									bind:value={feedbackData[cat.key]}
+									disabled={!feedbackUnlocked}
+									placeholder={feedbackUnlocked ? cat.label + 'についてのフィードバック...' : ''}
+									rows="2"
+								></textarea>
+							</div>
+						{/each}
+					</div>
 				</div>
 			</div>
 
@@ -2209,6 +2304,11 @@ ${list
 		border-color: #fecaca;
 	}
 
+	.btn-label {
+		font-size: 0.75rem;
+		font-weight: 500;
+	}
+
 	/* 入力時と参照時のスタイルを一致させる */
 	.entry-nikki {
 		color: #1f2937;
@@ -2834,11 +2934,23 @@ ${list
 		margin-bottom: 3px;
 	}
 
-	.entry-feedback-text {
-		font-size: 13px;
-		color: #1e40af;
+	.entry-feedback-cat {
+		margin-top: 4px;
+	}
+
+	.entry-feedback-cat-label {
+		display: block;
+		font-size: 11px;
+		font-weight: 700;
+		color: #1d4ed8;
+	}
+
+	.entry-feedback-cat-text {
+		font-size: 12px;
+		color: #1e3a5f;
 		white-space: pre-wrap;
-		line-height: 1.6;
+		line-height: 1.5;
+		margin: 1px 0 0;
 	}
 
 	/* フィードバックモーダル */
@@ -2978,5 +3090,103 @@ ${list
 		background: #f9fafb;
 		color: #9ca3af;
 		cursor: not-allowed;
+	}
+
+/* ── フィードバックカテゴリ ── */
+	.fb-categories {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		overflow-y: auto;
+		flex: 1;
+	}
+
+	.fb-cat-group {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+	}
+
+	.fb-cat-label {
+		font-size: 12px;
+		font-weight: 700;
+		color: #1e40af;
+	}
+
+	.fb-cat-desc {
+		font-size: 11px;
+		color: #6b7280;
+		margin: 0;
+	}
+
+	.fb-cat-textarea {
+		width: 100%;
+		padding: 6px 10px;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		font-size: 13px;
+		font-family: inherit;
+		line-height: 1.55;
+		resize: vertical;
+		outline: none;
+		transition: border-color 0.15s;
+	}
+
+	.fb-cat-textarea:focus {
+		border-color: #3b82f6;
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
+	}
+
+	.fb-cat-textarea:disabled {
+		background: #f9fafb;
+		color: #9ca3af;
+		cursor: not-allowed;
+	}
+
+/* ── プレビュー内フィードバック ── */
+	.pv-feedback {
+		margin-top: 10px;
+		padding: 8px 12px;
+		background: #eff6ff;
+		border-left: 3px solid #3b82f6;
+		border-radius: 0 6px 6px 0;
+	}
+
+	.pv-feedback-label {
+		display: block;
+		font-size: 11px;
+		font-weight: 700;
+		color: #1d4ed8;
+		margin-bottom: 6px;
+	}
+
+	.pv-feedback-cat {
+		margin-bottom: 4px;
+	}
+
+	.pv-feedback-cat-label {
+		font-size: 11px;
+		font-weight: 700;
+		color: #1e40af;
+	}
+
+	.pv-feedback-cat-text {
+		font-size: 12px;
+		color: #1f2937;
+		white-space: pre-wrap;
+		line-height: 1.5;
+		margin: 1px 0 0;
+	}
+
+	.pv-td-feedback {
+		max-width: 200px;
+		white-space: pre-wrap;
+		font-size: 12px;
+	}
+
+	.pv-fb-cat {
+		display: block;
+		margin-bottom: 2px;
+		font-size: 11px;
 	}
 </style>

@@ -452,22 +452,8 @@
 
 	// ランクに対応するバッジカラーを返す
 	// ── ランクカラー (単一の真実源 / Single Source of Truth) ──
-	const RANK_COLORS: Record<string, { bg: string; fg: string; bd: string }> = {
-		ルーキー:   { bg: '#fdf3ec', fg: '#7d4e1b', bd: '#c8813a' },
-		ブロンズ:   { bg: '#fef0e6', fg: '#8b4513', bd: '#cd7f32' },
-		シルバー:   { bg: '#f5f6f7', fg: '#5a6475', bd: '#9ba5b0' },
-		ゴールド:   { bg: '#fffbeb', fg: '#a16207', bd: '#d4af37' },
-		プラチナ:   { bg: '#e0f7fc', fg: '#0077b6', bd: '#22d3ee' },
-		ダイヤ:     { bg: '#e8eaf6', fg: '#3730a3', bd: '#818cf8' },
-		マスター:   { bg: '#f5f3ff', fg: '#7c3aed', bd: '#a78bfa' },
-		プレデター: { bg: '#fff1f2', fg: '#be123c', bd: '#f87171' },
-	};
-
-	/** RANK_COLORS からインラインスタイル文字列を生成 */
-	function rankStyle(rank: string): string {
-		const c = RANK_COLORS[rank];
-		return c ? `background:${c.bg};color:${c.fg};border-color:${c.bd}` : '';
-	}
+	/** ランクバッジはニュートラルグレーで統一 */
+	function rankStyle(_rank: string): string { return ''; }
 
 	/** 日記テキストを1行目(リード)と残り(ボディ)に分割 */
 	function splitNikkiLead(text: string): { lead: string; body: string } {
@@ -2515,8 +2501,8 @@ ${list
 
 	/* 入力時と参照時のスタイルを一致させる */
 	.entry-nikki {
-		background: #fffbeb;
-		border-left: 3px solid #fbbf24;
+		background: #f9fafb;
+		border-left: 3px solid #d1d5db;
 		border-radius: 0 8px 8px 0;
 		padding: 0.5rem 0.75rem;
 		word-break: break-word;
@@ -3134,17 +3120,15 @@ ${list
 	.entry-feedback {
 		margin-top: 10px;
 		padding: 10px 14px;
-		background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
-		border-left: 3px solid #3b82f6;
+		background: #f9fafb;
+		border-left: 3px solid #d1d5db;
 		border-radius: 0 8px 8px 0;
 		cursor: pointer;
-		transition: background 0.15s, box-shadow 0.15s;
-		box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08);
+		transition: background 0.15s;
 	}
 
 	.entry-feedback:hover {
-		background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
-		box-shadow: 0 2px 8px rgba(59, 130, 246, 0.14);
+		background: #f3f4f6;
 	}
 
 	.entry-feedback-label {
@@ -3153,7 +3137,7 @@ ${list
 		gap: 4px;
 		font-size: 10.5px;
 		font-weight: 700;
-		color: #2563eb;
+		color: #6b7280;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		margin-bottom: 6px;

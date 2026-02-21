@@ -450,6 +450,20 @@
 		return `${y}年${m}月${day}日`;
 	}
 
+	// ランクに対応するバッジカラーを返す
+	function rankStyle(rank: string): string {
+		const map: Record<string, string> = {
+			ブロンズ: 'background:#fef3c7;color:#92400e;border-color:#f59e0b',
+			シルバー: 'background:#f1f5f9;color:#475569;border-color:#94a3b8',
+			ゴールド: 'background:#fefce8;color:#a16207;border-color:#eab308',
+			プラチナ: 'background:#f0fdf4;color:#166534;border-color:#86efac',
+			ダイヤ: 'background:#eff6ff;color:#1d4ed8;border-color:#60a5fa',
+			マスター: 'background:#faf5ff;color:#7e22ce;border-color:#c084fc',
+			プレデター: 'background:#fff1f2;color:#be123c;border-color:#fb7185'
+		};
+		return map[rank] ?? '';
+	}
+
 	function getEntriesToExport(): Entry[] {
 		if (selectedCount > 0) return filteredEntries.filter((e) => selectedIndices.has(e.row_index));
 		return filteredEntries;
@@ -612,25 +626,121 @@
 	}
 
 	async function exportExcel(list: Entry[]) {
-		const xlsxMod = await import('xlsx');
-		const XLSX = xlsxMod.default ?? xlsxMod;
-		const wsData = [
-			['日付', 'タイトル', '日記', 'ランク1', 'RP1', 'ランク2', 'RP2', '記録日時', 'フィードバック'],
-			...list.map((e) => {
-				const fbData = parseFeedback(e.feedback);
-				const parts: string[] = [];
-				if (fbData['free']) parts.push(fbData['free']);
-				FEEDBACK_CATEGORIES.filter((c) => fbData[c.key]).forEach((c) =>
-					parts.push(`[${c.label}] ${fbData[c.key]}`)
-				);
-				if (fbData['signer']) parts.push(`— ${fbData['signer']}`);
-				return [e.date, e.name, e.nikki, e.rank1, e.point1, e.rank2, e.point2, e.timestamp, parts.join('\n')];
-			})
-		];
-		const ws = XLSX.utils.aoa_to_sheet(wsData);
-		const wb = XLSX.utils.book_new();
-		XLSX.utils.book_append_sheet(wb, ws, '日記');
-		XLSX.writeFile(wb, `apex-diary-${todayStr()}.xlsx`);
+		// ExcelJS を使ってスタイル付きで出力
+		const ExcelJSMod = await import('exceljs');
+		const ExcelJS = ExcelJSMod.default ?? ExcelJSMod;
+		const wb = new ExcelJS.Workbook();
+		wb.creator = 'Apex成長日記';
+
+		const ws = wb.addWorksheet('日記');
+
+		// カラム定義
+		const COL_DEFS = [
+			{ header: '日付', key: 'date' },
+			{ header: 'タイトル', key: 'name' },
+			{ header: '日記', key: 'nikki' },
+			{ header: 'ランク1', key: 'rank1' },
+			{ header: 'RP1', key: 'point1' },
+			{ header: 'ランク2', key: 'rank2' },
+			{ header: 'RP2', key: 'point2' },
+			{ header: '記録日時', key: 'timestamp' },
+			{ header: 'フィードバック', key: 'feedback' }
+		] as const;
+		const NCOLS = COL_DEFS.length;
+
+		// CJK文字を2幅としてカラム幅を計算するヘルパー
+		const charW = (s: string) =>
+			[...s].reduce((w, c) => w + (c.charCodeAt(0) > 0x7f ? 2 : 1), 0);
+
+		// 初期幅（ヘッダー文字数+余白）でカラムを定義
+		ws.columns = COL_DEFS.map((c) => ({
+			header: c.header,
+			key: c.key,
+			width: charW(c.header) + 4
+		}));
+
+		// ── ヘッダー行スタイル ──
+		const HEADER_ROW = ws.getRow(1);
+		HEADER_ROW.height = 22;
+		HEADER_ROW.eachCell((cell, colIdx) => {
+			cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0284C7' } };
+			cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+			cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false };
+			cell.border = {
+				top: { style: 'medium' },
+				bottom: { style: 'medium' },
+				left: colIdx === 1 ? { style: 'medium' } : { style: 'thin' },
+				right: colIdx === NCOLS ? { style: 'medium' } : { style: 'thin' }
+			};
+		});
+
+		// ── データ行を追加 ──
+		const dataRows: (string | number | null)[][] = list.map((e) => {
+			const fbData = parseFeedback(e.feedback);
+			const fbParts: string[] = [];
+			if (fbData['free']) fbParts.push(fbData['free']);
+			FEEDBACK_CATEGORIES.filter((c) => fbData[c.key]).forEach((c) =>
+				fbParts.push(`[${c.label}] ${fbData[c.key]}`)
+			);
+			if (fbData['signer']) fbParts.push(`— ${fbData['signer']}`);
+			return [
+				e.date ?? null, e.name ?? null, e.nikki ?? null,
+				e.rank1 ?? null, e.point1 ? Number(e.point1) : null,
+				e.rank2 ?? null, e.point2 ? Number(e.point2) : null,
+				e.timestamp ?? null, fbParts.join('\n') || null
+			];
+		});
+
+		dataRows.forEach((rowData, ri) => {
+			const row = ws.addRow(rowData);
+			const isLast = ri === dataRows.length - 1;
+
+			row.eachCell({ includeEmpty: true }, (cell, colIdx) => {
+				const isWrap = colIdx === 3 || colIdx === 9; // 日記 / フィードバック
+				const isCenter = colIdx >= 4 && colIdx <= 8;
+				cell.alignment = {
+					wrapText: isWrap,
+					vertical: 'top',
+					horizontal: isCenter ? 'center' : 'left'
+				};
+				cell.border = {
+					top: { style: 'thin' },
+					bottom: isLast ? { style: 'medium' } : { style: 'thin' },
+					left: colIdx === 1 ? { style: 'medium' } : { style: 'thin' },
+					right: colIdx === NCOLS ? { style: 'medium' } : { style: 'thin' }
+				};
+			});
+
+			// 日記・フィードバックの行数に合わせて行高さを設定
+			const nikkiLines = String(rowData[2] ?? '').split('\n').length;
+			const fbLines = String(rowData[8] ?? '').split('\n').length;
+			row.height = Math.max(nikkiLines, fbLines, 1) * 15 + 4;
+		});
+
+		// ── カラム幅の自動フィット ──
+		ws.columns.forEach((col, i) => {
+			let maxW = charW(COL_DEFS[i].header) + 4;
+			col.eachCell({ includeEmpty: false }, (cell) => {
+				const val = String(cell.value ?? '');
+				const longestLine = val
+					.split('\n')
+					.reduce((m, l) => Math.max(m, charW(l)), 0);
+				maxW = Math.max(maxW, longestLine + 2);
+			});
+			col.width = Math.min(maxW, 60);
+		});
+
+		// ── バッファ生成 → ダウンロード ──
+		const buffer = await wb.xlsx.writeBuffer();
+		const blob = new Blob([buffer as ArrayBuffer], {
+			type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+		});
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `apex-diary-${todayStr()}.xlsx`;
+		a.click();
+		URL.revokeObjectURL(url);
 		await exportPhotosForList(list);
 	}
 
@@ -1354,14 +1464,14 @@ ${list
 									{#if entry.rank1 || entry.rank2}
 										<div class="entry-ranks">
 											{#if entry.rank1}
-												<span class="rank-badge"
-													>{entry.rank1}{entry.point1 ? ' ' + entry.point1 : ''}</span
-												>
+												<span class="rank-badge" style={rankStyle(entry.rank1)}>
+													{entry.rank1}{entry.point1 ? ' ' + entry.point1 + 'pt' : ''}
+												</span>
 											{/if}
 											{#if entry.rank2}
-												<span class="rank-badge"
-													>{entry.rank2}{entry.point2 ? ' ' + entry.point2 : ''}</span
-												>
+												<span class="rank-badge" style={rankStyle(entry.rank2)}>
+													{entry.rank2}{entry.point2 ? ' ' + entry.point2 + 'pt' : ''}
+												</span>
 											{/if}
 										</div>
 									{/if}
@@ -2308,18 +2418,19 @@ ${list
 
 	.entry-card {
 		background: #fff;
-		border: 1.5px solid #f3f4f6;
+		border: 1.5px solid #e5e7eb;
 		border-radius: 14px;
-		padding: 1rem 1.125rem;
-		transition: border-color 0.15s, box-shadow 0.15s;
+		padding: 1rem 1.25rem;
+		transition: border-color 0.2s, box-shadow 0.2s;
 		display: flex;
 		gap: 0.75rem;
 		align-items: flex-start;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 	}
 
 	.entry-card:hover {
-		border-color: #bae6fd;
-		box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
+		border-color: #93c5fd;
+		box-shadow: 0 4px 14px rgba(2, 132, 199, 0.12);
 	}
 
 	.entry-card.selected {
@@ -2391,11 +2502,15 @@ ${list
 	/* 入力時と参照時のスタイルを一致させる */
 	.entry-nikki {
 		color: #1f2937;
-		font-size: 0.95rem;
-		line-height: 1.75;
+		font-size: 0.93rem;
+		line-height: 1.8;
 		white-space: pre-wrap;
 		word-break: break-word;
 		font-family: inherit;
+		background: #fffbeb;
+		border-left: 3px solid #fbbf24;
+		border-radius: 0 8px 8px 0;
+		padding: 0.5rem 0.75rem;
 	}
 
 	.entry-ranks {
@@ -2406,12 +2521,13 @@ ${list
 
 	.rank-badge {
 		background: #f3f4f6;
-		border: 1px solid #e5e7eb;
-		border-radius: 7px;
+		border: 1.5px solid #e5e7eb;
+		border-radius: 20px;
 		color: #374151;
-		font-size: 0.8rem;
-		font-weight: 600;
-		padding: 0.2rem 0.65rem;
+		font-size: 0.78rem;
+		font-weight: 700;
+		padding: 0.2rem 0.7rem;
+		letter-spacing: 0.02em;
 	}
 
 	.entry-timestamp {
@@ -2991,26 +3107,32 @@ ${list
 
 	.entry-feedback {
 		margin-top: 10px;
-		padding: 8px 12px;
-		background: #eff6ff;
+		padding: 10px 14px;
+		background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
 		border-left: 3px solid #3b82f6;
-		border-radius: 0 6px 6px 0;
+		border-radius: 0 8px 8px 0;
 		cursor: pointer;
-		transition: background 0.15s;
+		transition: background 0.15s, box-shadow 0.15s;
+		box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08);
 	}
 
 	.entry-feedback:hover {
-		background: #dbeafe;
+		background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+		box-shadow: 0 2px 8px rgba(59, 130, 246, 0.14);
 	}
 
 	.entry-feedback-label {
-		display: block;
-		font-size: 10px;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 10.5px;
 		font-weight: 700;
-		color: #3b82f6;
+		color: #2563eb;
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		margin-bottom: 3px;
+		letter-spacing: 0.06em;
+		margin-bottom: 6px;
+		padding-bottom: 5px;
+		border-bottom: 1px dashed rgba(59, 130, 246, 0.3);
 	}
 
 	.entry-feedback-cat {
@@ -3018,10 +3140,14 @@ ${list
 	}
 
 	.entry-feedback-cat-label {
-		display: block;
-		font-size: 11px;
+		display: inline-block;
+		font-size: 10px;
 		font-weight: 700;
 		color: #1d4ed8;
+		background: rgba(59, 130, 246, 0.1);
+		padding: 1px 7px;
+		border-radius: 10px;
+		margin-bottom: 2px;
 	}
 
 	.entry-feedback-free {
@@ -3042,10 +3168,13 @@ ${list
 
 	.entry-feedback-signer {
 		font-size: 12px;
-		color: #6b7280;
+		color: #4b5563;
 		text-align: right;
-		margin-top: 6px;
+		margin-top: 8px;
+		padding-top: 6px;
+		border-top: 1px solid rgba(59, 130, 246, 0.2);
 		font-style: italic;
+		font-weight: 500;
 	}
 
 	/* フィードバックモーダル */

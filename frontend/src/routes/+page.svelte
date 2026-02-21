@@ -3,18 +3,18 @@
 	import { fade, fly, slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
 
-	const RANKS = ['', 'ブロンズ', 'シルバー', 'ゴールド', 'プラチナ', 'ダイヤ', 'マスター', 'プレデター'];
+	const RANKS = ['', 'ルーキー', 'ブロンズ', 'シルバー', 'ゴールド', 'プラチナ', 'ダイヤ', 'マスター', 'プレデター'];
 	const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 	const FEEDBACK_CATEGORIES = [
-		{ key: 'aim', label: 'エイム・撃ち合い', desc: '命中率、リコイルコントロール、被弾の多さ' },
-		{ key: 'positioning', label: '立ち回り・位置取り', desc: '有利ポジションの確保、遮蔽物の利用、射線管理' },
-		{ key: 'judgment', label: '状況判断', desc: '交戦・撤退のタイミング、漁夫の警戒、リング移動のルート' },
-		{ key: 'teamwork', label: '連携・カバー', desc: '味方との距離感、フォーカス（狙い）合わせ、情報共有・報告' },
-		{ key: 'ability', label: 'アビリティ・アルティメット', desc: '使用タイミング、スキルの無駄撃ち' },
-		{ key: 'movement', label: 'キャラクターコントロール', desc: '被弾を抑える動き、移動・展開のスピード' },
-		{ key: 'resources', label: 'リソース管理', desc: '回復アイテム・弾薬のバランス、漁るスピード' },
-		{ key: 'mental', label: 'メンタル', desc: '焦り、判断の迷い、集中力の低下' }
+		{ key: 'aim',         label: 'エイム・撃ち合い',           desc: '命中率、リコイルコントロール、被弾の多さ',             color: '#ef4444' },
+		{ key: 'positioning', label: '立ち回り・位置取り',         desc: '有利ポジションの確保、遮蔽物の利用、射線管理',         color: '#3b82f6' },
+		{ key: 'judgment',    label: '状況判断',                   desc: '交戦・撤退のタイミング、漁夫の警戒、リング移動のルート', color: '#f59e0b' },
+		{ key: 'teamwork',    label: '連携・カバー',               desc: '味方との距離感、フォーカス（狙い）合わせ、情報共有・報告', color: '#22c55e' },
+		{ key: 'ability',     label: 'アビリティ・アルティメット', desc: '使用タイミング、スキルの無駄撃ち',                     color: '#a855f7' },
+		{ key: 'movement',    label: 'キャラクターコントロール',   desc: '被弾を抑える動き、移動・展開のスピード',               color: '#06b6d4' },
+		{ key: 'resources',   label: 'リソース管理',               desc: '回復アイテム・弾薬のバランス、漁るスピード',           color: '#78716c' },
+		{ key: 'mental',      label: 'メンタル',                   desc: '焦り、判断の迷い、集中力の低下',                       color: '#ec4899' }
 	] as const;
 
 	const SIGNER_OPTIONS = ['もぐ太'] as const;
@@ -451,17 +451,28 @@
 	}
 
 	// ランクに対応するバッジカラーを返す
+	// ── ランクカラー (単一の真実源 / Single Source of Truth) ──
+	const RANK_COLORS: Record<string, { bg: string; fg: string; bd: string }> = {
+		ルーキー:   { bg: '#fdf3ec', fg: '#7d4e1b', bd: '#c8813a' },
+		ブロンズ:   { bg: '#fef0e6', fg: '#8b4513', bd: '#cd7f32' },
+		シルバー:   { bg: '#f5f6f7', fg: '#5a6475', bd: '#9ba5b0' },
+		ゴールド:   { bg: '#fffbeb', fg: '#a16207', bd: '#d4af37' },
+		プラチナ:   { bg: '#e0f7fc', fg: '#0077b6', bd: '#22d3ee' },
+		ダイヤ:     { bg: '#e8eaf6', fg: '#3730a3', bd: '#818cf8' },
+		マスター:   { bg: '#f5f3ff', fg: '#7c3aed', bd: '#a78bfa' },
+		プレデター: { bg: '#fff1f2', fg: '#be123c', bd: '#f87171' },
+	};
+
+	/** RANK_COLORS からインラインスタイル文字列を生成 */
 	function rankStyle(rank: string): string {
-		const map: Record<string, string> = {
-			ブロンズ: 'background:#fef3c7;color:#92400e;border-color:#f59e0b',
-			シルバー: 'background:#f1f5f9;color:#475569;border-color:#94a3b8',
-			ゴールド: 'background:#fefce8;color:#a16207;border-color:#eab308',
-			プラチナ: 'background:#f0fdf4;color:#166534;border-color:#86efac',
-			ダイヤ: 'background:#eff6ff;color:#1d4ed8;border-color:#60a5fa',
-			マスター: 'background:#faf5ff;color:#7e22ce;border-color:#c084fc',
-			プレデター: 'background:#fff1f2;color:#be123c;border-color:#fb7185'
-		};
-		return map[rank] ?? '';
+		const c = RANK_COLORS[rank];
+		return c ? `background:${c.bg};color:${c.fg};border-color:${c.bd}` : '';
+	}
+
+	/** 日記テキストを1行目(リード)と残り(ボディ)に分割 */
+	function splitNikkiLead(text: string): { lead: string; body: string } {
+		const nl = text.indexOf('\n');
+		return nl >= 0 ? { lead: text.slice(0, nl), body: text.slice(nl + 1) } : { lead: text, body: '' };
 	}
 
 	function getEntriesToExport(): Entry[] {
@@ -744,20 +755,6 @@
 		await exportPhotosForList(list);
 	}
 
-	function rankStyleInline(rank: string): string {
-		const m: Record<string, string> = {
-			ルーキー:   'background:#fdf3ec;color:#7d4e1b;border-color:#c8813a',
-			ブロンズ:   'background:#fef0e6;color:#8b4513;border-color:#cd7f32',
-			シルバー:   'background:#f5f6f7;color:#5a6475;border-color:#9ba5b0',
-			ゴールド:   'background:#fffbeb;color:#a16207;border-color:#d4af37',
-			プラチナ:   'background:#e0f7fc;color:#0077b6;border-color:#22d3ee',
-			ダイヤ:     'background:#e8eaf6;color:#3730a3;border-color:#818cf8',
-			マスター:   'background:#f5f3ff;color:#7c3aed;border-color:#a78bfa',
-			プレデター: 'background:#fff1f2;color:#be123c;border-color:#f87171'
-		};
-		return m[rank] ?? '';
-	}
-
 	async function exportPDF(list: Entry[]) {
 		const today = fmtDate(todayStr());
 		const escHtml = (s: string) =>
@@ -821,12 +818,12 @@ ${list
     <span class="date">${fmtDate(e.date)}</span>
     ${e.name ? `<span class="badge">${escHtml(e.name)}</span>` : ''}
   </div>
-  <div class="nikki">${(() => { const nl = e.nikki.indexOf('\n'); const lead = nl >= 0 ? e.nikki.slice(0, nl) : e.nikki; const body = nl >= 0 ? e.nikki.slice(nl+1) : ''; return '<p class="nikki-lead">' + escHtml(lead) + '</p>' + (body ? '<p class="nikki-body">' + escHtml(body) + '</p>' : ''); })()}  </div>
+  <div class="nikki">${(() => { const { lead, body } = splitNikkiLead(e.nikki); return '<p class="nikki-lead">' + escHtml(lead) + '</p>' + (body ? '<p class="nikki-body">' + escHtml(body) + '</p>' : ''); })()}</div>
   ${
 		e.rank1 || e.rank2
 			? `<div class="ranks">
-    ${e.rank1 ? `<span class="rank-badge" style="${rankStyleInline(e.rank1)}">${escHtml(e.rank1)}${e.point1 ? ' ' + escHtml(e.point1) : ''}</span>` : ''}
-    ${e.rank2 ? `<span class="rank-badge" style="${rankStyleInline(e.rank2)}">${escHtml(e.rank2)}${e.point2 ? ' ' + escHtml(e.point2) : ''}</span>` : ''}
+    ${e.rank1 ? `<span class="rank-badge" style="${rankStyle(e.rank1)}">${escHtml(e.rank1)}${e.point1 ? ' ' + escHtml(e.point1) : ''}</span>` : ''}
+    ${e.rank2 ? `<span class="rank-badge" style="${rankStyle(e.rank2)}">${escHtml(e.rank2)}${e.point2 ? ' ' + escHtml(e.point2) : ''}</span>` : ''}
   </div>`
 			: ''
 	}
@@ -836,23 +833,12 @@ ${list
 			: ''
 	}
   ${e.timestamp ? `<p class="ts">${escHtml(e.timestamp)}</p>` : ''}
-  ${(() => { const fbData = (() => { try { return JSON.parse(e.feedback || '{}'); } catch { return {}; } })();
-    const cats = [
-      { key: 'aim',         label: 'エイム・撃ち合い',           color: '#ef4444' },
-      { key: 'positioning', label: '立ち回り・位置取り',         color: '#3b82f6' },
-      { key: 'judgment',    label: '状況判断',                   color: '#f59e0b' },
-      { key: 'teamwork',    label: '連携・カバー',               color: '#22c55e' },
-      { key: 'ability',     label: 'アビリティ・アルティメット', color: '#a855f7' },
-      { key: 'movement',    label: 'キャラクターコントロール',   color: '#06b6d4' },
-      { key: 'resources',   label: 'リソース管理',               color: '#78716c' },
-      { key: 'mental',      label: 'メンタル',                   color: '#ec4899' }
-    ];
-    const filled = cats.filter(c => fbData[c.key]);
-    const hasFb = fbData.free || filled.length > 0 || fbData.signer;
-    if (!hasFb) return '';
+  ${(() => {
+    const fbData = parseFeedback(e.feedback);
+    const filled = FEEDBACK_CATEGORIES.filter(c => fbData[c.key]);
+    if (!(fbData.free || filled.length || fbData.signer)) return '';
     const freeHtml = fbData.free ? `<p class="feedback-free">${escHtml(fbData.free)}</p>` : '';
-    const hex22 = (c) => c + '33';
-    const catsHtml = filled.map(c => `<div class="feedback-cat"><span class="feedback-cat-label" style="background:${hex22(c.color)};color:${c.color};border-left-color:${c.color};">${escHtml(c.label)}</span><span style="font-size:12px;color:#1f2937;white-space:pre-wrap;"> ${escHtml(fbData[c.key])}</span></div>`).join('');
+    const catsHtml = filled.map(c => `<div class="feedback-cat"><span class="feedback-cat-label" style="background:${c.color}33;color:${c.color};border-left-color:${c.color};">${escHtml(c.label)}</span><span style="font-size:12px;color:#1f2937;white-space:pre-wrap;"> ${escHtml(fbData[c.key])}</span></div>`).join('');
     const signerHtml = fbData.signer ? `<p class="feedback-signer">— ${escHtml(fbData.signer)}</p>` : '';
     return `<div class="feedback"><div class="feedback-title">💬 フィードバック</div>${freeHtml}${catsHtml}${signerHtml}</div>`;
   })()}
@@ -1481,19 +1467,23 @@ ${list
 									</div>
 
 									{#if entry.nikki}
-										<p class="entry-nikki">{entry.nikki}</p>
+										{@const { lead: _nkLead, body: _nkBody } = splitNikkiLead(entry.nikki)}
+										<div class="entry-nikki">
+											<p class="entry-nikki-lead">{_nkLead}</p>
+											{#if _nkBody}<p class="entry-nikki-body">{_nkBody}</p>{/if}
+										</div>
 									{/if}
 
 									{#if entry.rank1 || entry.rank2}
 										<div class="entry-ranks">
 											{#if entry.rank1}
 												<span class="rank-badge" style={rankStyle(entry.rank1)}>
-													{entry.rank1}{entry.point1 ? ' ' + entry.point1 + 'pt' : ''}
+													{entry.rank1}{entry.point1 ? ' ' + entry.point1 : ''}
 												</span>
 											{/if}
 											{#if entry.rank2}
 												<span class="rank-badge" style={rankStyle(entry.rank2)}>
-													{entry.rank2}{entry.point2 ? ' ' + entry.point2 + 'pt' : ''}
+													{entry.rank2}{entry.point2 ? ' ' + entry.point2 : ''}
 												</span>
 											{/if}
 										</div>

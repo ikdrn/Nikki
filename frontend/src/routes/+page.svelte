@@ -7,14 +7,14 @@
 	const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 	const FEEDBACK_CATEGORIES = [
-		{ key: 'aim',         label: 'エイム・撃ち合い',           desc: '命中率、リコイルコントロール、被弾の多さ',             color: '#ef4444' },
-		{ key: 'positioning', label: '立ち回り・位置取り',         desc: '有利ポジションの確保、遮蔽物の利用、射線管理',         color: '#3b82f6' },
-		{ key: 'judgment',    label: '状況判断',                   desc: '交戦・撤退のタイミング、漁夫の警戒、リング移動のルート', color: '#f59e0b' },
-		{ key: 'teamwork',    label: '連携・カバー',               desc: '味方との距離感、フォーカス（狙い）合わせ、情報共有・報告', color: '#22c55e' },
-		{ key: 'ability',     label: 'アビリティ・アルティメット', desc: '使用タイミング、スキルの無駄撃ち',                     color: '#a855f7' },
-		{ key: 'movement',    label: 'キャラクターコントロール',   desc: '被弾を抑える動き、移動・展開のスピード',               color: '#06b6d4' },
-		{ key: 'resources',   label: 'リソース管理',               desc: '回復アイテム・弾薬のバランス、漁るスピード',           color: '#78716c' },
-		{ key: 'mental',      label: 'メンタル',                   desc: '焦り、判断の迷い、集中力の低下',                       color: '#ec4899' }
+		{ key: 'aim',         label: 'エイム・撃ち合い',           desc: '命中率、リコイルコントロール、被弾の多さ' },
+		{ key: 'positioning', label: '立ち回り・位置取り',         desc: '有利ポジションの確保、遮蔽物の利用、射線管理' },
+		{ key: 'judgment',    label: '状況判断',                   desc: '交戦・撤退のタイミング、漁夫の警戒、リング移動のルート' },
+		{ key: 'teamwork',    label: '連携・カバー',               desc: '味方との距離感・フォーカス合わせ・情報共有' },
+		{ key: 'ability',     label: 'アビリティ・アルティメット', desc: '使用タイミング、スキルの無駄撃ち' },
+		{ key: 'movement',    label: 'キャラクターコントロール',   desc: '被弾を抑える動き、移動・展開のスピード' },
+		{ key: 'resources',   label: 'リソース管理',               desc: '回復アイテム・弾薬のバランス、漁るスピード' },
+		{ key: 'mental',      label: 'メンタル',                   desc: '焦り、判断の迷い、集中力の低下' }
 	] as const;
 
 	const SIGNER_OPTIONS = ['もぐ太'] as const;
@@ -788,7 +788,7 @@
   .feedback-title { font-size: 11px; font-weight: 700; color: #1d4ed8; margin-bottom: 5px; letter-spacing: 0.05em; }
   .feedback-free { font-size: 13px; color: #1f2937; white-space: pre-wrap; margin-bottom: 6px; line-height: 1.65; }
   .feedback-cat { margin-bottom: 5px; }
-  .feedback-cat-label { display: block; font-size: 10px; font-weight: 700; color: #64748b; margin-bottom: 1px; }
+  .feedback-cat-label { display: block; font-size: 10px; font-weight: 700; color: #2563eb; margin-bottom: 1px; }
   .feedback-cat-body { font-size: 12px; color: #1f2937; white-space: pre-wrap; line-height: 1.5; }
   .feedback-signer { font-size: 12px; color: #4b5563; text-align: right; margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(59,130,246,0.25); font-style: italic; }
   @media print { body { padding: 20px; } .photos img { max-width: 180px; max-height: 150px; } }
@@ -825,7 +825,7 @@ ${list
     const filled = FEEDBACK_CATEGORIES.filter(c => fbData[c.key]);
     if (!(fbData.free || filled.length || fbData.signer)) return '';
     const freeHtml = fbData.free ? `<p class="feedback-free">${escHtml(fbData.free)}</p>` : '';
-    const catsHtml = filled.map(c => `<div class="feedback-cat"><span class="feedback-cat-label" style="background:${c.color}33;color:${c.color};border-left-color:${c.color};">${escHtml(c.label)}</span><span style="font-size:12px;color:#1f2937;white-space:pre-wrap;"> ${escHtml(fbData[c.key])}</span></div>`).join('');
+    const catsHtml = filled.map(c => `<div class="feedback-cat"><span class="feedback-cat-label">・${escHtml(c.label)}</span><span class="feedback-cat-body">${escHtml(fbData[c.key])}</span></div>`).join('');
     const signerHtml = fbData.signer ? `<p class="feedback-signer">— ${escHtml(fbData.signer)}</p>` : '';
     return `<div class="feedback"><div class="feedback-title">💬 フィードバック</div>${freeHtml}${catsHtml}${signerHtml}</div>`;
   })()}
@@ -1502,7 +1502,7 @@ ${list
 												{#each FEEDBACK_CATEGORIES as cat}
 													{#if fbData[cat.key]}
 														<div class="entry-feedback-cat">
-															<span class="entry-feedback-cat-label" style="background:{cat.color + '22'};color:{cat.color};border-left:3px solid {cat.color};">{cat.label}</span>
+															<span class="entry-feedback-cat-label">・{cat.label}</span>
 															<p class="entry-feedback-cat-text">{fbData[cat.key]}</p>
 														</div>
 													{/if}
@@ -3120,15 +3120,15 @@ ${list
 	.entry-feedback {
 		margin-top: 10px;
 		padding: 10px 14px;
-		background: #f9fafb;
-		border-left: 3px solid #d1d5db;
+		background: #f0f6ff;
+		border-left: 3px solid #93c5fd;
 		border-radius: 0 8px 8px 0;
 		cursor: pointer;
 		transition: background 0.15s;
 	}
 
 	.entry-feedback:hover {
-		background: #f3f4f6;
+		background: #dbeafe;
 	}
 
 	.entry-feedback-label {
@@ -3137,7 +3137,7 @@ ${list
 		gap: 4px;
 		font-size: 10.5px;
 		font-weight: 700;
-		color: #6b7280;
+		color: #2563eb;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		margin-bottom: 6px;
@@ -3153,7 +3153,7 @@ ${list
 		display: block;
 		font-size: 10px;
 		font-weight: 700;
-		color: #64748b;
+		color: #2563eb;
 		margin-bottom: 1px;
 	}
 

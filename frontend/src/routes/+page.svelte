@@ -801,8 +801,9 @@
   .feedback { margin-top: 12px; background: linear-gradient(135deg,#eff6ff,#f0f9ff); border-left: 3px solid #3b82f6; padding: 8px 12px; border-radius: 0 6px 6px 0; }
   .feedback-title { font-size: 11px; font-weight: 700; color: #1d4ed8; margin-bottom: 5px; letter-spacing: 0.05em; }
   .feedback-free { font-size: 13px; color: #1f2937; white-space: pre-wrap; margin-bottom: 6px; line-height: 1.65; }
-  .feedback-cat { margin-bottom: 6px; font-size: 12px; color: #1f2937; white-space: pre-wrap; }
-  .feedback-cat-label { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 20px; margin-bottom: 2px; border-left: 3px solid; }
+  .feedback-cat { margin-bottom: 5px; }
+  .feedback-cat-label { display: block; font-size: 10px; font-weight: 700; color: #64748b; margin-bottom: 1px; }
+  .feedback-cat-body { font-size: 12px; color: #1f2937; white-space: pre-wrap; line-height: 1.5; }
   .feedback-signer { font-size: 12px; color: #4b5563; text-align: right; margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(59,130,246,0.25); font-style: italic; }
   @media print { body { padding: 20px; } .photos img { max-width: 180px; max-height: 150px; } }
 </style>
@@ -3161,18 +3162,15 @@ ${list
 	}
 
 	.entry-feedback-cat {
-		margin-top: 4px;
+		margin-top: 5px;
 	}
 
 	.entry-feedback-cat-label {
-		display: inline-block;
+		display: block;
 		font-size: 10px;
 		font-weight: 700;
-		padding: 1px 7px 1px 6px;
-		border-radius: 10px;
-		margin-bottom: 2px;
-		border-left-width: 3px;
-		border-left-style: solid;
+		color: #64748b;
+		margin-bottom: 1px;
 	}
 
 	.entry-feedback-free {

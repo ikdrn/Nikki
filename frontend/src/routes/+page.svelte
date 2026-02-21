@@ -744,6 +744,20 @@
 		await exportPhotosForList(list);
 	}
 
+	function rankStyleInline(rank: string): string {
+		const m: Record<string, string> = {
+			ルーキー:   'background:#fdf3ec;color:#7d4e1b;border-color:#c8813a',
+			ブロンズ:   'background:#fef0e6;color:#8b4513;border-color:#cd7f32',
+			シルバー:   'background:#f5f6f7;color:#5a6475;border-color:#9ba5b0',
+			ゴールド:   'background:#fffbeb;color:#a16207;border-color:#d4af37',
+			プラチナ:   'background:#e0f7fc;color:#0077b6;border-color:#22d3ee',
+			ダイヤ:     'background:#e8eaf6;color:#3730a3;border-color:#818cf8',
+			マスター:   'background:#f5f3ff;color:#7c3aed;border-color:#a78bfa',
+			プレデター: 'background:#fff1f2;color:#be123c;border-color:#f87171'
+		};
+		return m[rank] ?? '';
+	}
+
 	async function exportPDF(list: Entry[]) {
 		const today = fmtDate(todayStr());
 		const escHtml = (s: string) =>
@@ -779,18 +793,20 @@
   .entry-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
   .date { font-size: 15px; font-weight: 700; color: #0284c7; }
   .badge { font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 20px; }
-  .nikki { white-space: pre-wrap; line-height: 1.75; font-size: 13.5px; color: #1f2937; }
+  .nikki { margin-top: 8px; background: #fffbeb; border-left: 3px solid #fbbf24; border-radius: 0 6px 6px 0; padding: 8px 12px; }
+  .nikki-lead { font-size: 15px; font-weight: 700; color: #1f2937; line-height: 1.6; margin: 0 0 4px; }
+  .nikki-body { font-size: 13px; color: #374151; white-space: pre-wrap; line-height: 1.75; margin: 0; }
   .ranks { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-  .rank-badge { font-size: 12px; background: #f3f4f6; border: 1px solid #e5e7eb; padding: 2px 10px; border-radius: 6px; }
+  .rank-badge { font-size: 12px; padding: 2px 10px; border-radius: 20px; border: 1.5px solid; font-weight: 700; }
   .ts { font-size: 11px; color: #9ca3af; margin-top: 8px; text-align: right; }
   .photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .photos img { max-width: 220px; max-height: 180px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; }
-  .feedback { margin-top: 12px; background: #eff6ff; border-left: 3px solid #3b82f6; padding: 8px 12px; border-radius: 0 6px 6px 0; }
-  .feedback-title { font-size: 11px; font-weight: 700; color: #1d4ed8; margin-bottom: 5px; }
-  .feedback-free { font-size: 13px; color: #1f2937; white-space: pre-wrap; margin-bottom: 6px; }
-  .feedback-cat { margin-bottom: 4px; font-size: 12px; color: #1f2937; white-space: pre-wrap; }
-  .feedback-cat-label { font-weight: 700; color: #1e40af; }
-  .feedback-signer { font-size: 12px; color: #4b5563; text-align: right; margin-top: 6px; font-style: italic; }
+  .feedback { margin-top: 12px; background: linear-gradient(135deg,#eff6ff,#f0f9ff); border-left: 3px solid #3b82f6; padding: 8px 12px; border-radius: 0 6px 6px 0; }
+  .feedback-title { font-size: 11px; font-weight: 700; color: #1d4ed8; margin-bottom: 5px; letter-spacing: 0.05em; }
+  .feedback-free { font-size: 13px; color: #1f2937; white-space: pre-wrap; margin-bottom: 6px; line-height: 1.65; }
+  .feedback-cat { margin-bottom: 6px; font-size: 12px; color: #1f2937; white-space: pre-wrap; }
+  .feedback-cat-label { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 20px; margin-bottom: 2px; border-left: 3px solid; }
+  .feedback-signer { font-size: 12px; color: #4b5563; text-align: right; margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(59,130,246,0.25); font-style: italic; }
   @media print { body { padding: 20px; } .photos img { max-width: 180px; max-height: 150px; } }
 </style>
 </head>
@@ -805,12 +821,12 @@ ${list
     <span class="date">${fmtDate(e.date)}</span>
     ${e.name ? `<span class="badge">${escHtml(e.name)}</span>` : ''}
   </div>
-  <p class="nikki">${escHtml(e.nikki)}</p>
+  <div class="nikki">${(() => { const nl = e.nikki.indexOf('\n'); const lead = nl >= 0 ? e.nikki.slice(0, nl) : e.nikki; const body = nl >= 0 ? e.nikki.slice(nl+1) : ''; return '<p class="nikki-lead">' + escHtml(lead) + '</p>' + (body ? '<p class="nikki-body">' + escHtml(body) + '</p>' : ''); })()}  </div>
   ${
 		e.rank1 || e.rank2
 			? `<div class="ranks">
-    ${e.rank1 ? `<span class="rank-badge">${escHtml(e.rank1)}${e.point1 ? ' ' + escHtml(e.point1) : ''}</span>` : ''}
-    ${e.rank2 ? `<span class="rank-badge">${escHtml(e.rank2)}${e.point2 ? ' ' + escHtml(e.point2) : ''}</span>` : ''}
+    ${e.rank1 ? `<span class="rank-badge" style="${rankStyleInline(e.rank1)}">${escHtml(e.rank1)}${e.point1 ? ' ' + escHtml(e.point1) : ''}</span>` : ''}
+    ${e.rank2 ? `<span class="rank-badge" style="${rankStyleInline(e.rank2)}">${escHtml(e.rank2)}${e.point2 ? ' ' + escHtml(e.point2) : ''}</span>` : ''}
   </div>`
 			: ''
 	}
@@ -821,15 +837,22 @@ ${list
 	}
   ${e.timestamp ? `<p class="ts">${escHtml(e.timestamp)}</p>` : ''}
   ${(() => { const fbData = (() => { try { return JSON.parse(e.feedback || '{}'); } catch { return {}; } })();
-    const cats = [{ key: 'aim', label: 'エイム・撃ち合い' }, { key: 'positioning', label: '立ち回り・位置取り' },
-      { key: 'judgment', label: '状況判断' }, { key: 'teamwork', label: '連携・カバー' },
-      { key: 'ability', label: 'アビリティ・アルティメット' }, { key: 'movement', label: 'キャラクターコントロール' },
-      { key: 'resources', label: 'リソース管理' }, { key: 'mental', label: 'メンタル' }];
+    const cats = [
+      { key: 'aim',         label: 'エイム・撃ち合い',           color: '#ef4444' },
+      { key: 'positioning', label: '立ち回り・位置取り',         color: '#3b82f6' },
+      { key: 'judgment',    label: '状況判断',                   color: '#f59e0b' },
+      { key: 'teamwork',    label: '連携・カバー',               color: '#22c55e' },
+      { key: 'ability',     label: 'アビリティ・アルティメット', color: '#a855f7' },
+      { key: 'movement',    label: 'キャラクターコントロール',   color: '#06b6d4' },
+      { key: 'resources',   label: 'リソース管理',               color: '#78716c' },
+      { key: 'mental',      label: 'メンタル',                   color: '#ec4899' }
+    ];
     const filled = cats.filter(c => fbData[c.key]);
     const hasFb = fbData.free || filled.length > 0 || fbData.signer;
     if (!hasFb) return '';
     const freeHtml = fbData.free ? `<p class="feedback-free">${escHtml(fbData.free)}</p>` : '';
-    const catsHtml = filled.map(c => `<div class="feedback-cat"><span class="feedback-cat-label">${escHtml(c.label)}: </span>${escHtml(fbData[c.key])}</div>`).join('');
+    const hex22 = (c) => c + '33';
+    const catsHtml = filled.map(c => `<div class="feedback-cat"><span class="feedback-cat-label" style="background:${hex22(c.color)};color:${c.color};border-left-color:${c.color};">${escHtml(c.label)}</span><span style="font-size:12px;color:#1f2937;white-space:pre-wrap;"> ${escHtml(fbData[c.key])}</span></div>`).join('');
     const signerHtml = fbData.signer ? `<p class="feedback-signer">— ${escHtml(fbData.signer)}</p>` : '';
     return `<div class="feedback"><div class="feedback-title">💬 フィードバック</div>${freeHtml}${catsHtml}${signerHtml}</div>`;
   })()}
@@ -1502,7 +1525,7 @@ ${list
 												{#each FEEDBACK_CATEGORIES as cat}
 													{#if fbData[cat.key]}
 														<div class="entry-feedback-cat">
-															<span class="entry-feedback-cat-label">{cat.label}</span>
+															<span class="entry-feedback-cat-label" style="background:{cat.color + '22'};color:{cat.color};border-left:3px solid {cat.color};">{cat.label}</span>
 															<p class="entry-feedback-cat-text">{fbData[cat.key]}</p>
 														</div>
 													{/if}
@@ -2501,16 +2524,28 @@ ${list
 
 	/* 入力時と参照時のスタイルを一致させる */
 	.entry-nikki {
-		color: #1f2937;
-		font-size: 0.93rem;
-		line-height: 1.8;
-		white-space: pre-wrap;
-		word-break: break-word;
-		font-family: inherit;
 		background: #fffbeb;
 		border-left: 3px solid #fbbf24;
 		border-radius: 0 8px 8px 0;
 		padding: 0.5rem 0.75rem;
+		word-break: break-word;
+		font-family: inherit;
+	}
+
+	.entry-nikki-lead {
+		font-size: 0.97rem;
+		font-weight: 700;
+		color: #111827;
+		line-height: 1.65;
+		margin: 0 0 0.25rem;
+	}
+
+	.entry-nikki-body {
+		font-size: 0.88rem;
+		color: #4b5563;
+		line-height: 1.75;
+		white-space: pre-wrap;
+		margin: 0;
 	}
 
 	.entry-ranks {
@@ -3143,11 +3178,11 @@ ${list
 		display: inline-block;
 		font-size: 10px;
 		font-weight: 700;
-		color: #1d4ed8;
-		background: rgba(59, 130, 246, 0.1);
-		padding: 1px 7px;
+		padding: 1px 7px 1px 6px;
 		border-radius: 10px;
 		margin-bottom: 2px;
+		border-left-width: 3px;
+		border-left-style: solid;
 	}
 
 	.entry-feedback-free {

@@ -1527,6 +1527,10 @@ ${list
 	{/if}
 </main>
 
+<footer class="app-footer">
+	<a href="/design" class="footer-link">📄 システム設計書</a>
+</footer>
+
 <!-- 出力プレビューモーダル -->
 {#if previewType !== null}
 	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
@@ -1827,7 +1831,25 @@ ${list
 	main {
 		max-width: 680px;
 		margin: 0 auto;
-		padding: 1.5rem 1rem 6rem;
+		padding: 1.5rem 1rem 2rem;
+	}
+
+	/* ── フッター ── */
+	.app-footer {
+		text-align: center;
+		padding: 1.5rem 1rem 2.5rem;
+		border-top: 1px solid #e5e7eb;
+		margin-top: 0;
+	}
+
+	.footer-link {
+		font-size: 0.82rem;
+		color: #6b7280;
+		text-decoration: none;
+	}
+
+	.footer-link:hover {
+		color: #0284c7;
 	}
 
 	/* ── ヘッダー ── */
@@ -3119,16 +3141,16 @@ ${list
 
 	.entry-feedback {
 		margin-top: 10px;
-		padding: 10px 14px;
-		background: #f0f6ff;
-		border-left: 3px solid #93c5fd;
+		padding: 0.5rem 0.75rem;
+		background: #f9fafb;
+		border-left: 3px solid #d1d5db;
 		border-radius: 0 8px 8px 0;
 		cursor: pointer;
 		transition: background 0.15s;
 	}
 
 	.entry-feedback:hover {
-		background: #dbeafe;
+		background: #f3f4f6;
 	}
 
 	.entry-feedback-label {
@@ -3137,12 +3159,12 @@ ${list
 		gap: 4px;
 		font-size: 10.5px;
 		font-weight: 700;
-		color: #2563eb;
+		color: #6b7280;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		margin-bottom: 6px;
 		padding-bottom: 5px;
-		border-bottom: 1px dashed rgba(59, 130, 246, 0.3);
+		border-bottom: 1px dashed #e5e7eb;
 	}
 
 	.entry-feedback-cat {
@@ -3153,21 +3175,21 @@ ${list
 		display: block;
 		font-size: 10px;
 		font-weight: 700;
-		color: #2563eb;
+		color: #6b7280;
 		margin-bottom: 1px;
 	}
 
 	.entry-feedback-free {
-		font-size: 13px;
-		color: #1e3a5f;
+		font-size: 0.88rem;
+		color: #111827;
 		white-space: pre-wrap;
-		line-height: 1.6;
+		line-height: 1.65;
 		margin: 4px 0 6px;
 	}
 
 	.entry-feedback-cat-text {
-		font-size: 12px;
-		color: #1e3a5f;
+		font-size: 0.88rem;
+		color: #4b5563;
 		white-space: pre-wrap;
 		line-height: 1.5;
 		margin: 1px 0 0;
@@ -3179,7 +3201,7 @@ ${list
 		text-align: right;
 		margin-top: 8px;
 		padding-top: 6px;
-		border-top: 1px solid rgba(59, 130, 246, 0.2);
+		border-top: 1px solid #e5e7eb;
 		font-style: italic;
 		font-weight: 500;
 	}

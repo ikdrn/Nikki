@@ -2,10 +2,12 @@ package handler
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"net/smtp"
 	"os"
 	"sort"
 	"strings"
@@ -225,6 +227,80 @@ func buildRow(date, name, nikki, rank1, rank2 string, point1, point2 *int, photo
 	return row, rowName, nil
 }
 
+// sendNotification はメール通知を非同期で送信する。
+// SMTP環境変数が未設定の場合は静かにスキップする。
+func sendNotification(subject, body string) {
+	to := os.Getenv("NOTIFICATION_EMAIL")
+	host := os.Getenv("SMTP_HOST")
+	port := os.Getenv("SMTP_PORT")
+	user := os.Getenv("SMTP_USER")
+	pass := os.Getenv("SMTP_PASS")
+
+	if to == "" || host == "" || user == "" || pass == "" {
+		return
+	}
+	if port == "" {
+		port = "587"
+	}
+
+	addr := host + ":" + port
+	msg := []byte("To: " + to + "\r\n" +
+		"From: " + user + "\r\n" +
+		"Subject: " + subject + "\r\n" +
+		"Content-Type: text/plain; charset=UTF-8\r\n" +
+		"\r\n" +
+		body + "\r\n")
+
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: false,
+		ServerName:         host,
+	}
+	conn, err := tls.Dial("tcp", addr, tlsConfig)
+	if err != nil {
+		// STARTTLSにフォールバック
+		auth := smtp.PlainAuth("", user, pass, host)
+		if smtpErr := smtp.SendMail(addr, auth, user, []string{to}, msg); smtpErr != nil {
+			log.Printf("sendNotification error: %v", smtpErr)
+		}
+		return
+	}
+	defer conn.Close()
+
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		log.Printf("sendNotification smtp client error: %v", err)
+		return
+	}
+	defer client.Quit()
+
+	auth := smtp.PlainAuth("", user, pass, host)
+	if err := client.Auth(auth); err != nil {
+		log.Printf("sendNotification auth error: %v", err)
+		return
+	}
+	if err := client.Mail(user); err != nil {
+		log.Printf("sendNotification MAIL error: %v", err)
+		return
+	}
+	if err := client.Rcpt(to); err != nil {
+		log.Printf("sendNotification RCPT error: %v", err)
+		return
+	}
+	w, err := client.Data()
+	if err != nil {
+		log.Printf("sendNotification DATA error: %v", err)
+		return
+	}
+	if _, err := w.Write(msg); err != nil {
+		log.Printf("sendNotification write error: %v", err)
+		return
+	}
+	if err := w.Close(); err != nil {
+		log.Printf("sendNotification close error: %v", err)
+		return
+	}
+}
+
 // Handler は Vercel サーバーレス関数のエントリーポイント。
 func Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -297,6 +373,11 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(NikkiResponse{Success: false, Message: err.Error()})
 		return
 	}
+
+	go sendNotification(
+		"[Nikki] 新しい日記が保存されました",
+		fmt.Sprintf("日付: %s\nタイトル: %s\n\n日記が保存されました。", req.Date, req.Name),
+	)
 
 	json.NewEncoder(w).Encode(NikkiResponse{Success: true, Message: "保存しました"})
 }
@@ -410,6 +491,11 @@ func handlePatch(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(NikkiResponse{Success: false, Message: "フィードバック保存失敗"})
 		return
 	}
+
+	go sendNotification(
+		"[Nikki] フィードバックが保存されました",
+		fmt.Sprintf("行番号: %d\n\nフィードバックが保存されました。", req.RowIndex),
+	)
 
 	json.NewEncoder(w).Encode(NikkiResponse{Success: true, Message: "フィードバックを保存しました"})
 }

@@ -3559,6 +3559,7 @@ ${list
 		border-bottom: 1px solid #e5e7eb;
 	}
 
+	/* 自由欄（青のまま） */
 	.fb-view-free {
 		background: #f0f6ff;
 		border: 1px solid #bfdbfe;
@@ -3579,41 +3580,42 @@ ${list
 		margin: 0;
 	}
 
+	/* カテゴリ 2列グリッド */
 	.fb-view-cats {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
 	}
 
 	.fb-view-cat {
-		padding: 8px 12px;
-		background: #f8fafc;
-		border-left: 3px solid #93c5fd;
-		border-radius: 0 6px 6px 0;
+		padding: 9px 11px;
+		background: #f9fafb;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
 	}
 
 	.fb-view-cat-label {
 		display: block;
 		font-size: 11px;
 		font-weight: 700;
-		color: #2563eb;
+		color: #6b7280;
 		margin-bottom: 4px;
 	}
 
 	.fb-view-cat-text {
-		font-size: 0.875rem;
+		font-size: 0.85rem;
 		color: #374151;
-		line-height: 1.65;
+		line-height: 1.6;
 		white-space: pre-wrap;
 		margin: 0;
 	}
 
 	.fb-view-signer {
 		font-size: 13px;
-		color: #2563eb;
+		color: #6b7280;
 		text-align: right;
 		font-style: italic;
-		font-weight: 600;
+		font-weight: 500;
 		margin: 0;
 		padding-top: 6px;
 		border-top: 1px solid #e5e7eb;

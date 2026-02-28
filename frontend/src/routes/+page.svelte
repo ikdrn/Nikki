@@ -1770,51 +1770,85 @@ ${list
 						</div>
 					</div>
 
-					<div class="fb-free-group">
-						<label class="fb-cat-label">📝 自由欄</label>
-						<textarea
-							class="fb-cat-textarea"
-							bind:value={feedbackData['free']}
-							disabled={!feedbackUnlocked}
-							placeholder={feedbackUnlocked ? '総評や自由コメントを入力...' : ''}
-							rows="3"
-						></textarea>
-					</div>
-
-					<div class="fb-categories">
-						{#each FEEDBACK_CATEGORIES as cat}
-							<div class="fb-cat-group">
-								<label class="fb-cat-label">{cat.label}</label>
-								<p class="fb-cat-desc">{cat.desc}</p>
-								<textarea
-									class="fb-cat-textarea"
-									bind:value={feedbackData[cat.key]}
-									disabled={!feedbackUnlocked}
-									placeholder={feedbackUnlocked ? cat.label + 'についてのフィードバック...' : ''}
-									rows="2"
-								></textarea>
-							</div>
-						{/each}
-					</div>
-
-					<div class="fb-signer-group">
-						<label class="fb-signer-label" for="fb-signer">✍️ 署名</label>
-						<div class="fb-signer-wrap">
-							<input
-								id="fb-signer"
-								list="signer-list"
-								class="fb-signer-input"
-								bind:value={feedbackData['signer']}
-								disabled={!feedbackUnlocked}
-								placeholder={feedbackUnlocked ? '名前を入力または選択...' : ''}
-							/>
-							<datalist id="signer-list">
-								{#each SIGNER_OPTIONS as opt}
-									<option value={opt} />
-								{/each}
-							</datalist>
+					{#if feedbackUnlocked}
+						<!-- 編集モード -->
+						<div class="fb-free-group">
+							<label class="fb-cat-label">📝 自由欄</label>
+							<textarea
+								class="fb-cat-textarea"
+								bind:value={feedbackData['free']}
+								placeholder="総評や自由コメントを入力..."
+								rows="3"
+							></textarea>
 						</div>
-					</div>
+
+						<div class="fb-categories">
+							{#each FEEDBACK_CATEGORIES as cat}
+								<div class="fb-cat-group">
+									<label class="fb-cat-label">{cat.label}</label>
+									<p class="fb-cat-desc">{cat.desc}</p>
+									<textarea
+										class="fb-cat-textarea"
+										bind:value={feedbackData[cat.key]}
+										placeholder="{cat.label}についてのフィードバック..."
+										rows="2"
+									></textarea>
+								</div>
+							{/each}
+						</div>
+
+						<div class="fb-signer-group">
+							<label class="fb-signer-label" for="fb-signer">✍️ 署名</label>
+							<div class="fb-signer-wrap">
+								<input
+									id="fb-signer"
+									list="signer-list"
+									class="fb-signer-input"
+									bind:value={feedbackData['signer']}
+									placeholder="名前を入力または選択..."
+								/>
+								<datalist id="signer-list">
+									{#each SIGNER_OPTIONS as opt}
+										<option value={opt} />
+									{/each}
+								</datalist>
+							</div>
+						</div>
+					{:else}
+						<!-- 閲覧モード（PW未入力） -->
+						{@const fbView = feedbackData}
+						{@const hasAnyFb = fbView['free'] || FEEDBACK_CATEGORIES.some(c => fbView[c.key]) || fbView['signer']}
+						{#if hasAnyFb}
+							<div class="fb-view">
+								{#if fbView['free']}
+									<div class="fb-view-section fb-view-free">
+										<span class="fb-view-section-title">📝 自由欄</span>
+										<p class="fb-view-free-text">{fbView['free']}</p>
+									</div>
+								{/if}
+								{#if FEEDBACK_CATEGORIES.some(c => fbView[c.key])}
+									<div class="fb-view-section">
+										<span class="fb-view-section-title">📋 カテゴリ別</span>
+										<div class="fb-view-cats">
+											{#each FEEDBACK_CATEGORIES as cat}
+												{#if fbView[cat.key]}
+													<div class="fb-view-cat">
+														<span class="fb-view-cat-label">・{cat.label}</span>
+														<p class="fb-view-cat-text">{fbView[cat.key]}</p>
+													</div>
+												{/if}
+											{/each}
+										</div>
+									</div>
+								{/if}
+								{#if fbView['signer']}
+									<p class="fb-view-signer">— {fbView['signer']}</p>
+								{/if}
+							</div>
+						{:else}
+							<p class="fb-view-empty">まだフィードバックがありません</p>
+						{/if}
+					{/if}
 				</div>
 			</div>
 
@@ -3192,69 +3226,72 @@ ${list
 
 	.entry-feedback {
 		margin-top: 10px;
-		padding: 0.5rem 0.75rem;
-		background: #f9fafb;
-		border-left: 3px solid #d1d5db;
+		padding: 0.65rem 0.85rem;
+		background: #f0f6ff;
+		border-left: 3px solid #93c5fd;
 		border-radius: 0 8px 8px 0;
 		cursor: pointer;
 		transition: background 0.15s;
 	}
 
 	.entry-feedback:hover {
-		background: #f3f4f6;
+		background: #dbeafe;
 	}
 
 	.entry-feedback-label {
 		display: flex;
 		align-items: center;
 		gap: 4px;
-		font-size: 10.5px;
+		font-size: 11px;
 		font-weight: 700;
-		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		margin-bottom: 6px;
-		padding-bottom: 5px;
-		border-bottom: 1px dashed #e5e7eb;
+		color: #2563eb;
+		letter-spacing: 0.04em;
+		margin-bottom: 8px;
+		padding-bottom: 6px;
+		border-bottom: 1px solid #bfdbfe;
 	}
 
 	.entry-feedback-cat {
-		margin-top: 5px;
+		margin-top: 8px;
+		padding-left: 4px;
 	}
 
 	.entry-feedback-cat-label {
 		display: block;
-		font-size: 10px;
+		font-size: 11px;
 		font-weight: 700;
-		color: #6b7280;
-		margin-bottom: 1px;
+		color: #2563eb;
+		margin-bottom: 2px;
 	}
 
 	.entry-feedback-free {
-		font-size: 0.88rem;
-		color: #111827;
+		font-size: 0.9rem;
+		color: #1e3a5f;
 		white-space: pre-wrap;
-		line-height: 1.65;
-		margin: 4px 0 6px;
+		line-height: 1.7;
+		margin: 2px 0 8px;
+		padding: 6px 10px;
+		background: rgba(255,255,255,0.65);
+		border-radius: 6px;
 	}
 
 	.entry-feedback-cat-text {
-		font-size: 0.88rem;
-		color: #4b5563;
+		font-size: 0.875rem;
+		color: #374151;
 		white-space: pre-wrap;
-		line-height: 1.5;
-		margin: 1px 0 0;
+		line-height: 1.6;
+		margin: 2px 0 0;
 	}
 
 	.entry-feedback-signer {
 		font-size: 12px;
-		color: #4b5563;
+		color: #2563eb;
 		text-align: right;
-		margin-top: 8px;
-		padding-top: 6px;
-		border-top: 1px solid #e5e7eb;
+		margin-top: 10px;
+		padding-top: 7px;
+		border-top: 1px solid #bfdbfe;
 		font-style: italic;
-		font-weight: 500;
+		font-weight: 600;
 	}
 
 	/* フィードバックモーダル */
@@ -3495,6 +3532,101 @@ ${list
 		background: #f9fafb;
 		color: #9ca3af;
 		cursor: not-allowed;
+	}
+
+/* ── フィードバック閲覧ビュー（PW未入力時） ── */
+	.fb-view {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+		overflow-y: auto;
+		flex: 1;
+	}
+
+	.fb-view-section {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.fb-view-section-title {
+		font-size: 11px;
+		font-weight: 700;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		padding-bottom: 5px;
+		border-bottom: 1px solid #e5e7eb;
+	}
+
+	/* 自由欄（青のまま） */
+	.fb-view-free {
+		background: #f0f6ff;
+		border: 1px solid #bfdbfe;
+		border-radius: 8px;
+		padding: 12px 14px;
+	}
+
+	.fb-view-free .fb-view-section-title {
+		color: #2563eb;
+		border-color: #bfdbfe;
+	}
+
+	.fb-view-free-text {
+		font-size: 0.95rem;
+		color: #1e3a5f;
+		line-height: 1.75;
+		white-space: pre-wrap;
+		margin: 0;
+	}
+
+	/* カテゴリ 2列グリッド */
+	.fb-view-cats {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
+	}
+
+	.fb-view-cat {
+		padding: 9px 11px;
+		background: #f9fafb;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+	}
+
+	.fb-view-cat-label {
+		display: block;
+		font-size: 11px;
+		font-weight: 700;
+		color: #6b7280;
+		margin-bottom: 4px;
+	}
+
+	.fb-view-cat-text {
+		font-size: 0.85rem;
+		color: #374151;
+		line-height: 1.6;
+		white-space: pre-wrap;
+		margin: 0;
+	}
+
+	.fb-view-signer {
+		font-size: 13px;
+		color: #6b7280;
+		text-align: right;
+		font-style: italic;
+		font-weight: 500;
+		margin: 0;
+		padding-top: 6px;
+		border-top: 1px solid #e5e7eb;
+	}
+
+	.fb-view-empty {
+		font-size: 14px;
+		color: #9ca3af;
+		text-align: center;
+		padding: 2rem 0;
+		margin: 0;
 	}
 
 /* ── プレビュー内フィードバック ── */

@@ -39,6 +39,10 @@
 	// ── タブ ──
 	let activeTab: 'write' | 'history' = 'write';
 
+	// ── URL共有 ──
+	let linkedEntryIndex: number | null = null;
+	let copiedIndex: number | null = null;
+
 	// ── 下書き (IndexedDB) ──
 	let hasDraft = false;
 	let showDraftBanner = false;
@@ -129,6 +133,20 @@
 		if (draft && (draft.nikki || draft.title)) {
 			hasDraft = true;
 			showDraftBanner = true;
+		}
+
+		// URL の ?entry=<row_index> を処理
+		const params = new URLSearchParams(window.location.search);
+		const entryParam = params.get('entry');
+		if (entryParam) {
+			const idx = parseInt(entryParam, 10);
+			if (!isNaN(idx)) {
+				linkedEntryIndex = idx;
+				activeTab = 'history';
+				await loadHistory();
+				await tick();
+				document.getElementById(`entry-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
 		}
 	});
 
@@ -326,6 +344,13 @@
 		if (tab === 'history' && entries.length === 0 && !loadingHistory) {
 			loadHistory();
 		}
+	}
+
+	async function copyEntryLink(rowIndex: number) {
+		const url = `${window.location.origin}${window.location.pathname}?entry=${rowIndex}`;
+		await navigator.clipboard.writeText(url);
+		copiedIndex = rowIndex;
+		setTimeout(() => { copiedIndex = null; }, 2000);
 	}
 
 	// ── 削除 ──
@@ -1323,8 +1348,10 @@ ${list
 				<div class="entry-list">
 					{#each filteredEntries as entry (entry.row_index)}
 						<div
+							id="entry-{entry.row_index}"
 							class="entry-card"
 							class:selected={selectedIndices.has(entry.row_index)}
+							class:linked={linkedEntryIndex === entry.row_index}
 							transition:fade={{ duration: 150 }}
 						>
 							{#if editingEntry?.row_index === entry.row_index}
@@ -1434,6 +1461,17 @@ ${list
 											<span class="entry-title-badge">{entry.name}</span>
 										{/if}
 										<div class="entry-actions">
+											<button
+												class="action-btn share-btn"
+												title="リンクをコピー"
+												on:click|stopPropagation={() => copyEntryLink(entry.row_index)}
+											>
+												{#if copiedIndex === entry.row_index}
+													✓ <span class="btn-label">コピー済</span>
+												{:else}
+													🔗 <span class="btn-label">共有</span>
+												{/if}
+											</button>
 											<button
 												class="action-btn feedback-btn"
 												class:has-feedback={!!entry.feedback}
@@ -2457,6 +2495,20 @@ ${list
 	.entry-card.selected {
 		border-color: #0369a1;
 		background: #f0f9ff;
+	}
+
+	.entry-card.linked {
+		animation: link-flash 2s ease-out forwards;
+	}
+
+	@keyframes link-flash {
+		0%   { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25); }
+		60%  { border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08); }
+		100% { border-color: #e5e7eb; box-shadow: none; }
+	}
+
+	.share-btn.action-btn {
+		color: #2563eb;
 	}
 
 	.entry-body {

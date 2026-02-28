@@ -3230,17 +3230,19 @@ ${list
 	}
 
 	.fb-ref-label {
-		font-size: 11px;
+		font-size: 12px;
 		font-weight: 700;
 		color: #6b7280;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		margin-bottom: 10px;
+		margin-bottom: 14px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid #e5e7eb;
 	}
 
 	.fb-ref-nikki {
-		font-size: 13px;
-		line-height: 1.75;
+		font-size: 14px;
+		line-height: 1.85;
 		color: #1f2937;
 		white-space: pre-wrap;
 	}
@@ -3445,8 +3447,8 @@ ${list
 
 /* ── プレビュー内フィードバック ── */
 	.pv-feedback {
-		margin-top: 10px;
-		padding: 8px 12px;
+		margin-top: 12px;
+		padding: 12px 16px;
 		background: #eff6ff;
 		border-left: 3px solid #3b82f6;
 		border-radius: 0 6px 6px 0;
@@ -3454,42 +3456,57 @@ ${list
 
 	.pv-feedback-label {
 		display: block;
-		font-size: 11px;
+		font-size: 12px;
 		font-weight: 700;
 		color: #1d4ed8;
-		margin-bottom: 6px;
+		margin-bottom: 10px;
+		padding-bottom: 6px;
+		border-bottom: 1px solid #bfdbfe;
 	}
 
 	.pv-feedback-cat {
-		margin-bottom: 4px;
+		margin-bottom: 10px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid #dbeafe;
+	}
+
+	.pv-feedback-cat:last-of-type {
+		margin-bottom: 0;
+		padding-bottom: 0;
+		border-bottom: none;
 	}
 
 	.pv-feedback-cat-label {
-		font-size: 11px;
+		display: block;
+		font-size: 12px;
 		font-weight: 700;
 		color: #1e40af;
+		margin-bottom: 3px;
 	}
 
 	.pv-feedback-free {
-		font-size: 13px;
+		font-size: 14px;
 		color: #1f2937;
 		white-space: pre-wrap;
-		margin-bottom: 6px;
+		line-height: 1.75;
+		margin-bottom: 10px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid #bfdbfe;
 	}
 
 	.pv-feedback-cat-text {
-		font-size: 12px;
+		font-size: 13px;
 		color: #1f2937;
 		white-space: pre-wrap;
-		line-height: 1.5;
-		margin: 1px 0 0;
+		line-height: 1.65;
+		margin: 0;
 	}
 
 	.pv-feedback-signer {
 		font-size: 12px;
 		color: #6b7280;
 		text-align: right;
-		margin-top: 6px;
+		margin-top: 10px;
 		font-style: italic;
 	}
 

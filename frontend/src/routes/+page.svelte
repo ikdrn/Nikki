@@ -39,6 +39,10 @@
 	// ── タブ ──
 	let activeTab: 'write' | 'history' = 'write';
 
+	// ── URL共有 ──
+	let linkedEntryIndex: number | null = null;
+	let copiedIndex: number | null = null;
+
 	// ── 下書き (IndexedDB) ──
 	let hasDraft = false;
 	let showDraftBanner = false;
@@ -129,6 +133,20 @@
 		if (draft && (draft.nikki || draft.title)) {
 			hasDraft = true;
 			showDraftBanner = true;
+		}
+
+		// URL の ?entry=<row_index> を処理
+		const params = new URLSearchParams(window.location.search);
+		const entryParam = params.get('entry');
+		if (entryParam) {
+			const idx = parseInt(entryParam, 10);
+			if (!isNaN(idx)) {
+				linkedEntryIndex = idx;
+				activeTab = 'history';
+				await loadHistory();
+				await tick();
+				document.getElementById(`entry-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
 		}
 	});
 
@@ -326,6 +344,13 @@
 		if (tab === 'history' && entries.length === 0 && !loadingHistory) {
 			loadHistory();
 		}
+	}
+
+	async function copyEntryLink(rowIndex: number) {
+		const url = `${window.location.origin}${window.location.pathname}?entry=${rowIndex}`;
+		await navigator.clipboard.writeText(url);
+		copiedIndex = rowIndex;
+		setTimeout(() => { copiedIndex = null; }, 2000);
 	}
 
 	// ── 削除 ──
@@ -1323,8 +1348,10 @@ ${list
 				<div class="entry-list">
 					{#each filteredEntries as entry (entry.row_index)}
 						<div
+							id="entry-{entry.row_index}"
 							class="entry-card"
 							class:selected={selectedIndices.has(entry.row_index)}
+							class:linked={linkedEntryIndex === entry.row_index}
 							transition:fade={{ duration: 150 }}
 						>
 							{#if editingEntry?.row_index === entry.row_index}
@@ -1434,6 +1461,17 @@ ${list
 											<span class="entry-title-badge">{entry.name}</span>
 										{/if}
 										<div class="entry-actions">
+											<button
+												class="action-btn share-btn"
+												title="リンクをコピー"
+												on:click|stopPropagation={() => copyEntryLink(entry.row_index)}
+											>
+												{#if copiedIndex === entry.row_index}
+													✓ <span class="btn-label">コピー済</span>
+												{:else}
+													🔗 <span class="btn-label">共有</span>
+												{/if}
+											</button>
 											<button
 												class="action-btn feedback-btn"
 												class:has-feedback={!!entry.feedback}
@@ -1673,8 +1711,7 @@ ${list
 
 <!-- フィードバックモーダル -->
 {#if feedbackEntry !== null}
-	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-	<div class="preview-overlay" on:click|self={closeFeedback}>
+	<div class="preview-overlay">
 		<div class="preview-modal fb-modal" role="dialog" aria-modal="true">
 			<div class="preview-header">
 				<div class="preview-title-row">
@@ -2460,6 +2497,20 @@ ${list
 		background: #f0f9ff;
 	}
 
+	.entry-card.linked {
+		animation: link-flash 2s ease-out forwards;
+	}
+
+	@keyframes link-flash {
+		0%   { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25); }
+		60%  { border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08); }
+		100% { border-color: #e5e7eb; box-shadow: none; }
+	}
+
+	.share-btn.action-btn {
+		color: #2563eb;
+	}
+
 	.entry-body {
 		flex: 1;
 		display: flex;
@@ -3231,17 +3282,19 @@ ${list
 	}
 
 	.fb-ref-label {
-		font-size: 11px;
+		font-size: 12px;
 		font-weight: 700;
 		color: #6b7280;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		margin-bottom: 10px;
+		margin-bottom: 14px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid #e5e7eb;
 	}
 
 	.fb-ref-nikki {
-		font-size: 13px;
-		line-height: 1.75;
+		font-size: 14px;
+		line-height: 1.85;
 		color: #1f2937;
 		white-space: pre-wrap;
 	}
@@ -3446,8 +3499,8 @@ ${list
 
 /* ── プレビュー内フィードバック ── */
 	.pv-feedback {
-		margin-top: 10px;
-		padding: 8px 12px;
+		margin-top: 12px;
+		padding: 12px 16px;
 		background: #eff6ff;
 		border-left: 3px solid #3b82f6;
 		border-radius: 0 6px 6px 0;
@@ -3455,42 +3508,57 @@ ${list
 
 	.pv-feedback-label {
 		display: block;
-		font-size: 11px;
+		font-size: 12px;
 		font-weight: 700;
 		color: #1d4ed8;
-		margin-bottom: 6px;
+		margin-bottom: 10px;
+		padding-bottom: 6px;
+		border-bottom: 1px solid #bfdbfe;
 	}
 
 	.pv-feedback-cat {
-		margin-bottom: 4px;
+		margin-bottom: 10px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid #dbeafe;
+	}
+
+	.pv-feedback-cat:last-of-type {
+		margin-bottom: 0;
+		padding-bottom: 0;
+		border-bottom: none;
 	}
 
 	.pv-feedback-cat-label {
-		font-size: 11px;
+		display: block;
+		font-size: 12px;
 		font-weight: 700;
 		color: #1e40af;
+		margin-bottom: 3px;
 	}
 
 	.pv-feedback-free {
-		font-size: 13px;
+		font-size: 14px;
 		color: #1f2937;
 		white-space: pre-wrap;
-		margin-bottom: 6px;
+		line-height: 1.75;
+		margin-bottom: 10px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid #bfdbfe;
 	}
 
 	.pv-feedback-cat-text {
-		font-size: 12px;
+		font-size: 13px;
 		color: #1f2937;
 		white-space: pre-wrap;
-		line-height: 1.5;
-		margin: 1px 0 0;
+		line-height: 1.65;
+		margin: 0;
 	}
 
 	.pv-feedback-signer {
 		font-size: 12px;
 		color: #6b7280;
 		text-align: right;
-		margin-top: 6px;
+		margin-top: 10px;
 		font-style: italic;
 	}
 

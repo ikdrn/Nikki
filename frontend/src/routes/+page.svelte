@@ -1537,14 +1537,16 @@ ${list
 												{#if fbData['free']}
 													<p class="entry-feedback-free">{fbData['free']}</p>
 												{/if}
-												{#each FEEDBACK_CATEGORIES as cat}
-													{#if fbData[cat.key]}
-														<div class="entry-feedback-cat">
-															<span class="entry-feedback-cat-label">・{cat.label}</span>
-															<p class="entry-feedback-cat-text">{fbData[cat.key]}</p>
-														</div>
-													{/if}
-												{/each}
+												<div class="entry-feedback-cats-grid">
+						{#each FEEDBACK_CATEGORIES as cat}
+							{#if fbData[cat.key]}
+								<div class="entry-feedback-cat">
+									<span class="entry-feedback-cat-label">・{cat.label}</span>
+									<p class="entry-feedback-cat-text">{fbData[cat.key]}</p>
+								</div>
+							{/if}
+						{/each}
+					</div>
 												{#if fbData['signer']}
 													<p class="entry-feedback-signer">— {fbData['signer']}</p>
 												{/if}
@@ -3227,15 +3229,15 @@ ${list
 	.entry-feedback {
 		margin-top: 10px;
 		padding: 0.65rem 0.85rem;
-		background: #f0f6ff;
-		border-left: 3px solid #93c5fd;
+		background: #f3f4f6;
+		border-left: 3px solid #d1d5db;
 		border-radius: 0 8px 8px 0;
 		cursor: pointer;
 		transition: background 0.15s;
 	}
 
 	.entry-feedback:hover {
-		background: #dbeafe;
+		background: #e5e7eb;
 	}
 
 	.entry-feedback-label {
@@ -3244,24 +3246,33 @@ ${list
 		gap: 4px;
 		font-size: 11px;
 		font-weight: 700;
-		color: #2563eb;
+		color: #6b7280;
 		letter-spacing: 0.04em;
 		margin-bottom: 8px;
 		padding-bottom: 6px;
-		border-bottom: 1px solid #bfdbfe;
+		border-bottom: 1px solid #e5e7eb;
+	}
+
+	.entry-feedback-cats-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
+		margin-top: 6px;
 	}
 
 	.entry-feedback-cat {
-		margin-top: 8px;
-		padding-left: 4px;
+		background: #ffffff;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		padding: 8px 10px;
 	}
 
 	.entry-feedback-cat-label {
 		display: block;
 		font-size: 11px;
 		font-weight: 700;
-		color: #2563eb;
-		margin-bottom: 2px;
+		color: #4b5563;
+		margin-bottom: 4px;
 	}
 
 	.entry-feedback-free {
@@ -3285,11 +3296,11 @@ ${list
 
 	.entry-feedback-signer {
 		font-size: 12px;
-		color: #2563eb;
+		color: #6b7280;
 		text-align: right;
 		margin-top: 10px;
 		padding-top: 7px;
-		border-top: 1px solid #bfdbfe;
+		border-top: 1px solid #e5e7eb;
 		font-style: italic;
 		font-weight: 600;
 	}

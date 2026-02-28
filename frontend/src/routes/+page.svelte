@@ -1673,8 +1673,7 @@ ${list
 
 <!-- フィードバックモーダル -->
 {#if feedbackEntry !== null}
-	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-	<div class="preview-overlay" on:click|self={closeFeedback}>
+	<div class="preview-overlay">
 		<div class="preview-modal fb-modal" role="dialog" aria-modal="true">
 			<div class="preview-header">
 				<div class="preview-title-row">
